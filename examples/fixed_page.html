@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Campus Library</title>
+  <style>
+    /* WCAG 2.5.8: clickable targets at least 24 x 24 CSS pixels */
+    .header a, button, li a { display: inline-block; min-width: 24px; min-height: 24px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <img src="logo.png" width="120" height="40" alt="Campus Library logo">
+    <a href="/cart"><span class="cart-icon"></span><span class="visually-hidden">Your borrowing cart</span></a>
+  </header>
+
+  <main class="content">
+    <h1>Campus Library</h1>
+    <p style="color: #595959; background-color: #ffffff;">
+      Return books by Friday to avoid a late fee.
+    </p>
+
+    <label for="search">Search the catalogue</label>
+    <input id="search" type="text" placeholder="Search the catalogue">
+    <button type="submit"><img src="search.svg" width="16" height="16" alt="Search"></button>
+
+    <h2>Quick links</h2>
+    <ul>
+      <li><a href="/hours">Opening hours</a></li>
+      <li><a href="/rooms">Book a study room</a></li>
+    </ul>
+  </main>
+</body>
+</html>

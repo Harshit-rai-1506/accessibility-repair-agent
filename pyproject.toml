@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "accessibility-repair-agent"
+version = "0.1.0"
+description = "An AI agent that finds and fixes web accessibility (WCAG) violations in HTML and verifies every fix by re-scanning."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Harshit Rai" }]
+
+# Everything the project needs across all phases is installed up front,
+# so later phases only add code, not setup work.
+dependencies = [
+    # Phase 0: browser + accessibility engine (axe-core runs inside Chromium)
+    "playwright>=1.56,<2",
+    # Phase 2: agent framework and model providers
+    "langchain>=1.4,<2",
+    "langchain-core>=1.6,<2",
+    "langgraph>=1.2,<2",
+    "langchain-groq>=1.1,<2",      # free hosted open-weight models (default)
+    "langchain-ollama>=1.1,<2",    # optional fully-local models
+    # Phase 3: Model Context Protocol (our own tool server + client adapter)
+    "mcp>=1.24,<2",
+    "langchain-mcp-adapters>=0.3,<0.4",
+    # Phase 4: retrieval over WCAG documentation
+    "chromadb>=1.5,<2",
+    "rank-bm25>=0.2.2",
+    "beautifulsoup4>=4.12",
+    # Shared utilities
+    "pydantic>=2.7,<3",
+    "python-dotenv>=1.0",
+    "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "browser: needs Playwright Chromium and the downloaded axe-core file",
+    "llm: calls a real model API (skipped unless a key is set)",
+]
