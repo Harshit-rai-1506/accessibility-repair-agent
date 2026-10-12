@@ -33,6 +33,8 @@ def test_groq_client_is_configured_for_free_tier(monkeypatch):
     llm = get_chat_model("groq:openai/gpt-oss-120b")
     assert type(llm).__name__ == "ChatGroq"
     assert llm.model_name == "openai/gpt-oss-120b"
-    assert llm.temperature == 0.0
+    # ChatGroq quietly turns 0 into 1e-8 (Groq treats an exact 0 specially),
+    # so we check "effectively zero" rather than equality.
+    assert llm.temperature < 1e-6
     assert llm.reasoning_effort == "low"
     assert llm.max_retries == 5
