@@ -26,10 +26,13 @@ dependencies = [
     # Phase 3: Model Context Protocol (our own tool server + client adapter)
     "mcp>=1.24,<2",
     "langchain-mcp-adapters>=0.3,<0.4",
+    # Loading resources as LangChain Documents (HTML -> Markdown)
+    "markdownify>=1.2,<2",
+    "beautifulsoup4>=4.12",
     # Phase 4: retrieval over WCAG documentation
+    "langchain-text-splitters>=1.1,<2",
     "chromadb>=1.5,<2",
     "rank-bm25>=0.2.2",
-    "beautifulsoup4>=4.12",
     # Shared utilities
     "pydantic>=2.7,<3",
     "python-dotenv>=1.0",
@@ -46,5 +49,6 @@ where = ["src"]
 testpaths = ["tests"]
 markers = [
     "browser: needs Playwright Chromium and the downloaded axe-core file",
+    "data: needs the resources from scripts/fetch_resources.py",
     "llm: calls a real model API (skipped unless a key is set)",
 ]

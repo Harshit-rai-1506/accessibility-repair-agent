@@ -23,6 +23,7 @@ PACKAGES = [
     ("playwright", "browser automation"),
     ("langchain", "model interface"),
     ("langgraph", "agent graph"),
+    ("markdownify", "HTML to Markdown"),
     ("langchain_groq", "Groq models"),
     ("langchain_ollama", "local models (optional)"),
     ("mcp", "Model Context Protocol"),
@@ -137,6 +138,22 @@ def check_scanner() -> None:
            "the scanner ran but results look wrong; check AXE_VERSION in .env")
 
 
+def check_documents() -> None:
+    try:
+        from a11y_agent.loaders import AxeRuleLoader, BenchmarkLoader, WCAGLoader
+        benchmark = BenchmarkLoader("accessguru").load()
+        access = BenchmarkLoader("access").load()
+        wcag = WCAGLoader()
+        pages = wcag.load()
+        rules = AxeRuleLoader(index=wcag.index).load()
+    except Exception as e:
+        report("Documents", "FAIL", str(e).splitlines()[0][:160],
+               "run: python scripts/fetch_resources.py   (then check the error above)")
+        return
+    report("Documents", "OK", f"benchmark {len(benchmark)} + {len(access)} rows, "
+           f"WCAG {len(pages)} pages, axe {len(rules)} rules")
+
+
 def check_model_config() -> str | None:
     try:
         from a11y_agent.config import ROOT as root, settings
@@ -174,6 +191,7 @@ def main() -> int:
     check_python()
     check_packages()
     check_resources()
+    check_documents()
     check_scanner()
     if args.skip_llm:
         report("Model config", "SKIP", "--skip-llm")

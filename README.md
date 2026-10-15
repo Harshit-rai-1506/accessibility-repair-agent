@@ -68,9 +68,11 @@ python scripts/fetch_resources.py           # benchmark, axe-core, WCAG docs (~3
 
 cp .env.example .env                        # Windows: copy .env.example .env
 # paste a free Groq key (https://console.groq.com/keys) into .env
+# .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 19 tests
+python -m pytest                            # 41 tests
+python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
 
@@ -81,7 +83,7 @@ The step-by-step explanation of what each command does, and why, is in
 
 | Phase | What gets built | Agent concepts | Status |
 |---|---|---|---|
-| 0 | Environment, pinned resources, scanner, scoring, model client, CI | Ground truth, reproducibility | ✅ Done |
+| 0 | Environment, pinned resources, LangChain document loaders, scanner, scoring, model client, CI | Ground truth, reproducibility, Documents | ✅ Done |
 | 1 | Benchmark loader, evaluation harness, zero-shot baseline | Evals before agents | Next |
 | 2 | LangGraph agent: scan → fix → verify → retry, with state and checkpoints | Graphs, state, conditional edges, loops | Planned |
 | 3 | MCP server exposing the scanner and fix tools; agent calls them as a client | Tool calling, MCP | Planned |
@@ -99,6 +101,7 @@ src/a11y_agent/
     scanner.py     Chromium + axe-core: the ground truth for every fix
     scoring.py     violation score and fix verification (AccessGuru metric)
     llm.py         one function that returns the configured chat model
+    loaders.py     LangChain document loaders (BaseLoader): benchmark rows, WCAG pages, axe rules
 scripts/
     fetch_resources.py   downloads pinned, checksum-verified resources into data/
     check_setup.py       tells you exactly what is missing

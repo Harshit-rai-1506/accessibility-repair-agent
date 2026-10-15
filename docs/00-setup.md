@@ -147,8 +147,9 @@ Three habits worth copying into any ML project:
 - **Pin versions.** Every source is fixed to an exact release or commit. If
   axe-core updates a rule next month, our benchmark numbers do not silently
   change.
-- **Verify checksums.** Each file has a known SHA-256. A corrupted or tampered
-  download stops the script instead of quietly changing the data.
+- **Verify checksums.** The axe-core file and the benchmark files each have a
+  known SHA-256. A corrupted or changed download stops the script instead of
+  quietly changing the data. (The W3C pages are pinned by Git commit instead.)
 - **Download, don't commit.** The data stays under its owners' licences and the
   repository stays small. `data/MANIFEST.json` records what was fetched, from
   where, and when.
@@ -156,9 +157,70 @@ Three habits worth copying into any ML project:
 The script tries the fast route first (direct download) and falls back to a
 sparse Git checkout, so it works on networks that block one or the other.
 
+**Why downloading does not use LangChain.** LangChain's document loaders
+*read* data into memory as text; they do not save files. Its web and Git
+loaders cannot pin a version, check a checksum, or fetch the axe-core
+JavaScript file the scanner injects into pages. So downloading stays a plain
+script, and LangChain takes over at the next step: reading.
+
 ---
 
-## Step 5. What is in the benchmark, and what we found
+## Step 5. Reading the resources as LangChain Documents
+
+```bash
+python -m a11y_agent.loaders                       # how many Documents each loader makes
+python -m a11y_agent.loaders --show wcag --limit 1 # look at one
+```
+
+A LangChain **Document** is a piece of text (`page_content`) plus a dictionary
+of facts about it (`metadata`). Every later LangChain component takes
+Documents as input: text splitters cut them into chunks, vector stores index
+them, retrievers return them. So turning each resource into Documents is the
+first step of any LangChain retrieval (RAG) pipeline.
+
+`src/a11y_agent/loaders.py` has one loader per resource:
+
+| Loader | One Document per | `page_content` | Key metadata |
+|---|---|---|---|
+| `BenchmarkLoader` | benchmark row (305 + 171) | the broken HTML snippet | `rule_id`, `impact`, `category`, `url` |
+| `WCAGLoader` (uses `WCAGPageLoader` per file, then `MarkdownTransformer`) | W3C page (581) | the page as Markdown | `sc` (e.g. `2.5.8`), `doc_type`, `level`, `technique_id`, `url` |
+| `AxeRuleLoader` | axe-core rule (105) | what the rule checks and how to pass it | `rule_id`, `impact`, `sc` |
+
+Things worth noticing, because they come up in any real RAG project:
+
+- **A loader is a small class.** Subclass LangChain's `BaseLoader` and write
+  `lazy_load()`, a generator that yields Documents one at a time. You get
+  `.load()` (all at once) for free. A transformer subclasses
+  `BaseDocumentTransformer` and maps Documents to new Documents.
+- **Why not LangChain's ready-made `CSVLoader` and `DirectoryLoader`?** They
+  live in `langchain-community`, which LangChain sunset in 2026 and no longer
+  maintains. Our first version used them, and CI flagged the package as
+  retired. We kept the standard interfaces from `langchain-core` (maintained)
+  and wrote the few lines of CSV reading and file finding ourselves. The
+  result plugs into every LangChain splitter, vector store and retriever
+  exactly the same way.
+- **Real data is messy.** The three benchmark files name their columns
+  differently, so a small table (`BENCHMARKS`) maps them onto the same
+  metadata keys. The ACCESS dataset stores each snippet as a printed Python
+  list (`[['<img ...>']]`), which the loader unwraps. Without
+  `encoding="utf-8"`, Windows would misread the files.
+- **Metadata is what makes retrieval precise.** The W3C source files never say
+  "this is success criterion 2.5.8": the number comes from the page's position
+  in `guidelines/index.html`, and which techniques belong to which criterion
+  lives in a separate data file. `WCAGIndex` reads both once and labels every
+  page. When axe reports `target-size`, retrieval can then filter to
+  `sc == "2.5.8"` and search only those pages.
+- **Transformers clean content.** `MarkdownTransformer` turns HTML into
+  Markdown. Headings become `#`/`##` lines (Phase 4 splits on these, so each
+  chunk stays within one section) and code examples become fenced blocks
+  the model can copy from.
+- **Vector stores are picky about metadata.** Chroma accepts only strings,
+  numbers and booleans, so lists such as "related success criteria" are stored
+  as `"2.4.4,4.1.2"`. A test checks this for every Document.
+
+---
+
+## Step 6. What is in the benchmark, and what we found
 
 The AccessGuru benchmark has 305 rows: real violations found on real websites,
 each with the failing HTML snippet. Here is one row:
@@ -184,7 +246,7 @@ anyone can reproduce them. The full breakdown is in
 
 ---
 
-## Step 6. The model
+## Step 7. The model
 
 ```bash
 cp .env.example .env      # Windows: copy .env.example .env
@@ -207,12 +269,16 @@ Then paste a free key from https://console.groq.com/keys into `.env`.
 - **Temperature 0** makes outputs as repeatable as possible, which an
   evaluation needs. (LangChain's Groq client silently sends 1e-8 instead of an
   exact 0; CI caught this when our first test expected exactly 0.)
-- **Never commit keys.** `.env` is in `.gitignore`; only `.env.example`, with
-  no key in it, is in the repository.
+- **Never commit keys.** `.env` is in `.gitignore`, so `git` on your laptop
+  will never upload it; only `.env.example`, with no key in it, is in the
+  repository. Do not create `.env` through the GitHub website: the website
+  ignores `.gitignore`, and in a public repository the key is visible to
+  everyone, permanently, in the file history. If that happens, revoke the key
+  at console.groq.com/keys and make a new one.
 
 ---
 
-## Step 7. Checking everything: setup check, tests, CI
+## Step 8. Checking everything: setup check, tests, CI
 
 ```bash
 python scripts/check_setup.py
@@ -221,22 +287,25 @@ python -m pytest
 
 `check_setup.py` checks, in order, the Python version, that all packages
 import, that every resource is present with the right checksum, that the
-browser and scanner work on both example pages, that a model and key are
-configured, and finally makes one tiny model call. Each failure prints the
+loaders turn them into Documents, that the browser and scanner work on both
+example pages, that a model and key are configured, and finally makes one tiny
+model call. Each failure prints the
 command that fixes it. A healthy run looks like:
 
 ```
 Python               OK    3.12.x
-Packages             OK    13/13 importable
-Resources            OK    axe-core 4.12.1, benchmark 7 files, WCAG corpus 624 files, axe rules 107 files
+Packages             OK    14/14 importable
+Resources            OK    axe-core 4.12.1, benchmark 7 files, WCAG corpus 625 files, axe rules 107 files
+Documents            OK    benchmark 305 + 171 rows, WCAG 581 pages, axe 105 rules
 Browser + scanner    OK    broken example: 12 rules violated (score 44); fixed example: 0
 Model config         OK    MODEL=groq:openai/gpt-oss-120b
 Model call           OK    replied "ready" in 0.6 s
 ```
 
-The **19 tests** cover the scoring rules (with hand-made scan results, no
+The **41 tests** cover the scoring rules (with hand-made scan results, no
 browser needed), the real scanner on both example pages, end-to-end fix
-verification, and the model configuration (without calling the API).
+verification, the model configuration (without calling the API), and the
+document loaders on the real downloaded data.
 
 **Continuous integration** (`.github/workflows/ci.yml`): on every push,
 GitHub starts a clean Linux machine and a clean Windows machine, follows the
@@ -258,6 +327,9 @@ the instructions are known to work on a machine that is not mine.
   function; nothing else imports a provider SDK.
 - **Why versions are pinned and checksummed.** So the same command gives the
   same numbers next month and on someone else's machine.
+- **What a LangChain Document is, and why loaders come first.** Text plus
+  metadata; every splitter, vector store and retriever consumes it. Good
+  metadata (here, WCAG numbers) is what lets retrieval filter precisely.
 
 ## Next: Phase 1
 

@@ -145,16 +145,17 @@ comparable.
 
 ### Phase 0: Setup and resources ✅
 
-**Built:** project packaging, pinned and checksum-verified downloads, the
-scanner, the scoring metric, the model client, a setup checker, 19 tests, and
-CI on Linux and Windows.
+**Built:** project packaging, pinned and checksum-verified downloads,
+LangChain document loaders for every resource, the scanner, the scoring
+metric, the model client, a setup checker, 41 tests, and CI on Linux and
+Windows.
 **Guide:** [docs/00-setup.md](00-setup.md)
 **Done when:** `check_setup.py` passes on your laptop and CI is green.
 
 ### Phase 1: Benchmark and baseline (about 3–4 hours)
 
 **Build**
-- `benchmark.py`: load the CSVs into typed `BenchmarkItem`s, keep the
+- `benchmark.py`: take the `BenchmarkLoader` Documents, keep the
   reproducible rows, save the dev/test split to a file.
 - `evaluate.py`: run any *fixer* over a split with limited concurrency, cache
   every model response on disk (re-runs cost nothing), write per-row results
@@ -198,9 +199,10 @@ versus HTTP transport, returning errors to the model.
 ### Phase 4: Retrieval over WCAG (about 4 hours)
 
 **Build**
-- Parse the W3C pages into clean sections; chunk by heading (roughly 300–500
-  tokens) with metadata: success criterion, document type (understanding,
-  technique, failure), technique ID, title, URL.
+- Start from the `WCAGLoader` and `AxeRuleLoader` Documents (already Markdown,
+  with success criterion, document type, technique ID, title and URL in the
+  metadata); chunk by heading with `MarkdownHeaderTextSplitter` (roughly
+  300–500 tokens per chunk).
 - Map each axe rule to its success criteria from the rule's tags.
 - Index in Chroma (local CPU embeddings) and BM25; merge with reciprocal rank
   fusion; filter to the violated rule's criteria.

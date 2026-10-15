@@ -14,8 +14,15 @@ What gets downloaded (into data/, which git ignores):
     axe-rules  axe-core rule metadata: rule -> WCAG criterion, impact, help text
 
 Every source is pinned to an exact version or commit so results are
-reproducible, and every single file has a known SHA-256 so a corrupted or
-tampered download fails loudly instead of silently changing the benchmark.
+reproducible. The axe-core file and the benchmark files also have known
+SHA-256 checksums, so a corrupted or changed download fails loudly instead of
+silently changing the results.
+
+This script only *downloads* files. Reading them into LangChain Documents is a
+separate step, done by the document loaders in src/a11y_agent/loaders.py.
+Downloading stays outside LangChain on purpose: LangChain's web and Git loaders
+return text, not files, so they cannot pin a version, verify a checksum, or
+fetch the axe-core JavaScript file the scanner injects into pages.
 """
 
 from __future__ import annotations
@@ -70,6 +77,7 @@ WCAG_COMMIT = "23bad5904949904275a08f1c6e395b78a02aa6f3"
 WCAG_PATHS = [
     "understanding/",
     "guidelines/sc/",
+    "guidelines/index.html",   # defines the numbering, e.g. target-size-minimum -> 2.5.8
     "techniques/aria/",
     "techniques/client-side-script/",
     "techniques/css/",
@@ -300,7 +308,9 @@ def fetch_benchmark(force: bool, method: str, full: bool) -> dict:
 
 def fetch_tree(repo: str, ref: str, paths: list[str], dest: Path, force: bool, method: str) -> dict:
     marker = dest / ".fetched.json"
-    if not force and marker.exists() and json.loads(marker.read_text()).get("ref") == ref:
+    previous = json.loads(marker.read_text()) if marker.exists() else {}
+    # Re-download when the pinned ref or the list of paths changes.
+    if not force and previous.get("ref") == ref and previous.get("paths") == paths:
         log(f"  = already present: {dest.relative_to(ROOT)}")
     else:
         github_subset(repo, ref, paths, dest, method)

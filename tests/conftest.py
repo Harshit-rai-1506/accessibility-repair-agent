@@ -11,12 +11,15 @@ def examples_dir() -> Path:
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip browser tests with a clear reason when axe-core has not been downloaded yet."""
+    """Skip tests that need downloaded resources, with the command that fixes it."""
     from a11y_agent.config import settings
 
-    if settings.axe_path.exists():
-        return
-    skip = pytest.mark.skip(reason="axe-core missing: run python scripts/fetch_resources.py --only axe")
+    missing = {
+        "browser": not settings.axe_path.exists(),
+        "data": not (settings.corpus_dir / "wcag" / "guidelines" / "index.html").exists()
+                or not (settings.benchmark_dir / "accessguru").exists(),
+    }
     for item in items:
-        if "browser" in item.keywords:
-            item.add_marker(skip)
+        for marker, is_missing in missing.items():
+            if is_missing and marker in item.keywords:
+                item.add_marker(pytest.mark.skip(reason="resources missing: run python scripts/fetch_resources.py"))
