@@ -51,4 +51,5 @@ markers = [
     "browser: needs Playwright Chromium and the downloaded axe-core file",
     "data: needs the resources from scripts/fetch_resources.py",
     "llm: calls a real model API (skipped unless a key is set)",
+    "slow: takes a minute or more (deselect with -m \"not slow\")",
 ]

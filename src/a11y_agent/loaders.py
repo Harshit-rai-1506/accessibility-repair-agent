@@ -88,6 +88,7 @@ class BenchmarkSpec:
     rule_column: str                  # axe rule id, e.g. "image-alt"
     impact_column: str                # "critical" | "serious" | "moderate" | "minor"
     url_column: str                   # page the snippet came from
+    description_column: str | None = None  # the rule's description, as the dataset states it
     category_column: str | None = None
     score_column: str | None = None   # precomputed impact score, if the CSV has one
     html_is_python_list: bool = False  # the ACCESS CSV stores "[['<a ...>']]"
@@ -101,6 +102,7 @@ BENCHMARKS: dict[str, BenchmarkSpec] = {
         rule_column="violationnumberID",
         impact_column="impact",
         url_column="webURL",
+        description_column="description",
         category_column="category",
         score_column="initialImpactScore",
     ),
@@ -111,6 +113,7 @@ BENCHMARKS: dict[str, BenchmarkSpec] = {
         rule_column="Violation Type",
         impact_column="Impact",
         url_column="webURL",
+        description_column="Description",
     ),
     # ACCESS (Huang et al. 2024): 171 rows from about 25 popular sites
     "access": BenchmarkSpec(
@@ -119,6 +122,7 @@ BENCHMARKS: dict[str, BenchmarkSpec] = {
         rule_column="id",
         impact_column="impact",
         url_column="webURL",
+        description_column="description",
         html_is_python_list=True,
     ),
 }
@@ -204,6 +208,8 @@ class BenchmarkLoader(BaseLoader):
                     "impact": impact,
                     "impact_score": impact_score,
                     "url": (raw.get(spec.url_column) or "").strip(),
+                    "description": (raw.get(spec.description_column) or "").strip()
+                                   if spec.description_column else "",
                 },
             )
 

@@ -1,9 +1,10 @@
 # Third-party resources
 
-This repository contains only original code. The resources below are
-downloaded at setup time by `scripts/fetch_resources.py` and are not
-redistributed here. Each is pinned to an exact version or commit, listed in
-`data/MANIFEST.json` after download.
+This repository contains original code, plus the AccessGuru prompt texts
+described at the end of this file. The resources below are downloaded at
+setup time by `scripts/fetch_resources.py` and are not redistributed here.
+Each is pinned to an exact version or commit, listed in `data/MANIFEST.json`
+after download.
 
 | Resource | Used for | Source (pinned) | Licence |
 |---|---|---|---|
@@ -30,3 +31,37 @@ that created the data:
 
 The evaluation metric (violation score decrease) follows the AccessGuru paper;
 the implementation in `src/a11y_agent/scoring.py` is written from scratch.
+
+## AccessGuru prompt texts
+
+`src/a11y_agent/prompts.py` contains prompt texts (the expert persona, the
+violation-category descriptions and the four metacognitive steps, including
+the corrective re-prompt) copied from
+`code/AccessGuru/AccessGuruCorrect/syntax_layout_metacognitive_reprompting_gpt4.py`
+in [NadeenAhmad/AccessGuruLLM](https://github.com/NadeenAhmad/AccessGuruLLM),
+so that our evaluation runs their method as published. They are used under the
+MIT licence:
+
+```
+MIT License
+
+Copyright (c) 2025 Nadeen Fathallah
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

@@ -154,6 +154,18 @@ def check_documents() -> None:
            f"WCAG {len(pages)} pages, axe {len(rules)} rules")
 
 
+def check_split() -> None:
+    try:
+        from a11y_agent.benchmark import load_split
+        dev, test = load_split("accessguru", "dev"), load_split("accessguru", "test")
+        access = load_split("access", "test")
+    except Exception as e:
+        report("Benchmark split", "FAIL", str(e).splitlines()[0][:160],
+               "run: python scripts/fetch_resources.py --only benchmark --force")
+        return
+    report("Benchmark split", "OK", f"AccessGuru dev {len(dev)} / test {len(test)}, ACCESS test {len(access)}")
+
+
 def check_model_config() -> str | None:
     try:
         from a11y_agent.config import ROOT as root, settings
@@ -192,6 +204,7 @@ def main() -> int:
     check_packages()
     check_resources()
     check_documents()
+    check_split()
     check_scanner()
     if args.skip_llm:
         report("Model config", "SKIP", "--skip-llm")

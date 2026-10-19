@@ -86,7 +86,7 @@ which violations can actually be reproduced:
 |---|---|---|---|
 | AccessGuru syntax + layout | 250 | **178** (128 syntax, 50 layout, 49 distinct rules) | Our main test set |
 | AccessGuru semantic | 55 | not attempted | Needs images and human judgement; out of scope |
-| ACCESS (Huang et al.) | 171 | measured in Phase 1 | Second test set |
+| ACCESS (Huang et al.) | 171 | **100** (26 rules) | Second test set |
 
 The 72 rows that do not reproduce are mostly `duplicate-id` (20, a rule axe
 has since retired), `landmark-unique` (14, needs the whole page) and
@@ -152,20 +152,33 @@ Windows.
 **Guide:** [docs/00-setup.md](00-setup.md)
 **Done when:** `check_setup.py` passes on your laptop and CI is green.
 
-### Phase 1: Benchmark and baseline (about 3–4 hours)
+### Phase 1: Benchmark and baseline ✅ built
 
-**Build**
-- `benchmark.py`: take the `BenchmarkLoader` Documents, keep the
-  reproducible rows, save the dev/test split to a file.
-- `evaluate.py`: run any *fixer* over a split with limited concurrency, cache
-  every model response on disk (re-runs cost nothing), write per-row results
-  (JSONL) and a summary.
-- Method A (zero-shot) and method B (AccessGuru-style prompt).
+**Built**
+- `benchmark.py`: reproducibility scan and a seeded, rule-stratified split,
+  committed as `splits/accessguru.json` (dev 40 / test 138) and
+  `splits/access.json` (test 100).
+- `prompts.py`, `methods.py`: `noop` (harness check), `zero_shot` (method A)
+  and `accessguru` (method B, prompts ported verbatim from the authors' code).
+- `model_client.py`: SQLite reply cache, token- and request-aware pacing,
+  `too_large` detection, clean stops at the daily quota or a rejected key.
+- `evaluate.py`: resumable runs, per-item JSONL, summaries, a like-for-like
+  table on items every method could send, and a content-kept check.
+- `.github/workflows/evaluate.yml`: run evaluations on GitHub with the key
+  stored as a repository secret.
+- Guide: [docs/01-evaluation.md](01-evaluation.md). 82 tests, using a
+  scripted fake model so no key is needed.
+
+**Measured while building:** ACCESS reproduces 100 of 171 rows. On the free
+tier's 8,000-token request limit, 3 dev items are too large for zero-shot and
+about 9 for AccessGuru, whose multi-turn conversation costs about 8 times the
+tokens (~42K vs ~350K for the dev set).
 
 **Concepts:** evaluation harnesses, caching, rate limits, parsing model output,
 dev/test discipline.
-**Done when:** a table with methods A and B on the dev set, and the ACCESS set's
-reproducible count.
+**Done when:** a table with methods A and B on the dev set. *Remaining:* the
+first runs with a real key (zero-shot in one sitting; AccessGuru over two days
+of free quota).
 
 ### Phase 2: The LangGraph agent (about 4–5 hours)
 
@@ -260,16 +273,20 @@ Groq free tier, per model, per organisation (October 2026):
 | openai/gpt-oss-20b | 30 | 1,000 | 8,000 | 200,000 |
 | Llama Prompt Guard 2 (86M) | 30 | 14,400 | 15,000 | 500,000 |
 
-Rough cost of one method on all 178 rows: about 1.5k tokens per attempt
-(including the model's reasoning) × about 1.3 attempts × 178 ≈ **350k tokens**.
+Estimated from the real prompts and snippets (Phase 1; see
+[01-evaluation.md §8](01-evaluation.md#8-budget-what-a-run-costs)):
 
-- **Free:** about two days of one model's quota per method; the 40-row dev set
-  fits comfortably in a day. All iteration happens here.
+| Split | zero_shot | accessguru |
+|---|---|---|
+| dev (40) | ~42K tokens, one sitting | ~350K tokens, 2 days free |
+| test (138) | ~156K tokens, one day | ~1.35M tokens, 7 days free |
+
+- **Free:** all development on the dev set; zero-shot fits in a day, AccessGuru
+  needs two (runs resume automatically).
 - **Paid (optional, final runs):** at $0.15 / $0.60 per million input/output
-  tokens for gpt-oss-120b, one method costs roughly $0.10–0.20, and the whole
-  study (five methods, two models) under $2.
-
-These are estimates; Phase 1 replaces them with measured numbers.
+  tokens for gpt-oss-120b, the whole test-set comparison costs well under $1,
+  and removes the `too_large` limit. The agent's real cost per item gets
+  measured in Phase 2.
 
 ---
 

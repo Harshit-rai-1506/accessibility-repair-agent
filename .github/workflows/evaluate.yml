@@ -1,0 +1,129 @@
+# Run an evaluation on GitHub's machines instead of your laptop.
+#
+# One-time setup: repository Settings -> Secrets and variables -> Actions ->
+# New repository secret, name GROQ_API_KEY, value your Groq key. Secrets are
+# encrypted, hidden in logs, and never shown to people viewing the repository.
+#
+# Then: Actions tab -> "evaluate" -> Run workflow, pick the method and split.
+# Only people with write access to the repository can start it.
+#
+# Runs resume: the model-reply cache and finished rows are kept between runs
+# (GitHub Actions cache), so if the daily free quota stops a run, start it
+# again the next day and it continues.
+name: evaluate
+
+on:
+  workflow_dispatch:
+    inputs:
+      method:
+        description: Repair method
+        type: choice
+        options: [zero_shot, accessguru, noop]
+        default: zero_shot
+      split:
+        description: Benchmark split (use test only for final numbers)
+        type: choice
+        options: [dev, test]
+        default: dev
+      dataset:
+        description: Benchmark
+        type: choice
+        options: [accessguru, access]
+        default: accessguru
+      model:
+        description: provider:model
+        default: groq:openai/gpt-oss-120b
+      limit:
+        description: Only the first N items (empty = all)
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evaluate-${{ inputs.dataset }}-${{ inputs.split }}-${{ inputs.method }}-${{ inputs.model }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      # Inputs go through environment variables, never pasted into scripts.
+      METHOD: ${{ inputs.method }}
+      SPLIT: ${{ inputs.split }}
+      DATASET: ${{ inputs.dataset }}
+      MODEL: ${{ inputs.model }}
+      LIMIT: ${{ inputs.limit }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the API key is set
+        if: inputs.method != 'noop'
+        shell: bash
+        run: |
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "::error::Add a repository secret named GROQ_API_KEY first (see the comment at the top of evaluate.yml)."
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m playwright install --with-deps chromium
+
+      - name: Download resources
+        run: python scripts/fetch_resources.py --only axe benchmark axe-rules
+
+      - name: Restore earlier progress
+        uses: actions/cache/restore@v6
+        with:
+          path: runs
+          key: runs-${{ inputs.dataset }}-${{ inputs.split }}-${{ inputs.method }}-${{ inputs.model }}-${{ github.run_id }}
+          restore-keys: |
+            runs-${{ inputs.dataset }}-${{ inputs.split }}-${{ inputs.method }}-${{ inputs.model }}-
+
+      - name: Evaluate
+        id: run
+        shell: bash
+        run: |
+          set +e
+          args=(--method "$METHOD" --dataset "$DATASET" --split "$SPLIT" --model "$MODEL")
+          if [ -n "$LIMIT" ]; then args+=(--limit "$LIMIT"); fi
+          python -m a11y_agent.evaluate run "${args[@]}"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          # 2 means "stopped at the daily quota": progress is saved, so not a failure
+          if [ $code -ne 0 ] && [ $code -ne 2 ]; then exit $code; fi
+
+      - name: Save progress for the next run
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: runs
+          key: runs-${{ inputs.dataset }}-${{ inputs.split }}-${{ inputs.method }}-${{ inputs.model }}-${{ github.run_id }}
+
+      - name: Report
+        if: always()
+        shell: bash
+        run: |
+          python -m a11y_agent.evaluate report --dataset "$DATASET" --split "$SPLIT" --save | tee report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/annotate_summary.py --dataset "$DATASET" --split "$SPLIT"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: evaluation-${{ inputs.dataset }}-${{ inputs.split }}-${{ inputs.method }}
+          path: |
+            runs/${{ inputs.dataset }}-${{ inputs.split }}
+            results/
+          if-no-files-found: ignore

@@ -5,8 +5,9 @@ and **proves each fix worked by re-scanning the page**. Built with LangGraph,
 an MCP tool server, retrieval over the official WCAG documentation, and
 guardrails. Runs on free, open-weight models.
 
-> **Status:** Phase 0 (setup and resources) is complete and tested on Linux and
-> Windows. Next: the evaluation harness and a zero-shot baseline.
+> **Status:** Phases 0 (setup) and 1 (evaluation harness, fixed benchmark
+> split, two baseline methods) are built and tested on Linux and Windows.
+> Baseline numbers come from the first runs with a real model key.
 > See the [build plan](docs/PLAN.md).
 
 ## The problem
@@ -26,8 +27,12 @@ it is structured, and verify every fix by scanning again.
   2025) on the AccessGuru benchmark. We use the **178 of 250** syntax and
   layout violations that reproduce from their stored HTML with axe-core
   4.12.1, so every result is checked by a scanner, not judged by a model.
+  They are split once into a 40-item dev set and a 138-item test set
+  ([splits/](splits/)); ACCESS (Huang et al. 2024) adds 100 more test items.
 - *Comparison:* a zero-shot prompt and AccessGuru's prompting method, re-run
   with the same model and scorer, plus the paper's published numbers for context.
+- *Side effects:* fixes that break another rule, and fixes that "work" by
+  deleting content, are counted separately.
 - *Second metric:* how often the guardrails reject a proposed fix, and why.
 - *Constraint:* free open-weight models (OpenAI gpt-oss on Groq's free tier).
 
@@ -71,20 +76,33 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 41 tests
+python -m pytest                            # 82 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
 
-The step-by-step explanation of what each command does, and why, is in
-[docs/00-setup.md](docs/00-setup.md).
+Run the evaluation (Phase 1):
+
+```bash
+python -m a11y_agent.evaluate run --method noop              # harness check, no model, ~20 s
+python -m a11y_agent.evaluate run --method zero_shot         # dev split, ~42K tokens
+python -m a11y_agent.evaluate run --method accessguru        # dev split, ~350K tokens: spans 2 days of free quota
+python -m a11y_agent.evaluate report                         # compare everything run so far
+```
+
+Runs resume where they stopped, and every model reply is cached, so
+re-running never pays twice. You can also run evaluations on GitHub instead
+of your laptop: see [docs/01-evaluation.md](docs/01-evaluation.md#9-running-it).
+
+Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup) and
+[docs/01-evaluation.md](docs/01-evaluation.md) (evaluation).
 
 ## Roadmap
 
 | Phase | What gets built | Agent concepts | Status |
 |---|---|---|---|
 | 0 | Environment, pinned resources, LangChain document loaders, scanner, scoring, model client, CI | Ground truth, reproducibility, Documents | ✅ Done |
-| 1 | Benchmark loader, evaluation harness, zero-shot baseline | Evals before agents | Next |
+| 1 | Fixed dev/test split, evaluation harness, zero-shot and AccessGuru baselines | Evals before agents, caching, rate limits | ✅ Built; numbers pending first runs |
 | 2 | LangGraph agent: scan → fix → verify → retry, with state and checkpoints | Graphs, state, conditional edges, loops | Planned |
 | 3 | MCP server exposing the scanner and fix tools; agent calls them as a client | Tool calling, MCP | Planned |
 | 4 | Retrieval over WCAG Understanding docs and Techniques | Chunking, embeddings, hybrid search, metadata filters | Planned |
@@ -102,9 +120,16 @@ src/a11y_agent/
     scoring.py     violation score and fix verification (AccessGuru metric)
     llm.py         one function that returns the configured chat model
     loaders.py     LangChain document loaders (BaseLoader): benchmark rows, WCAG pages, axe rules
+    benchmark.py   reproducible rows and the fixed dev/test split
+    prompts.py     zero-shot and AccessGuru prompts; pulling HTML out of replies
+    methods.py     repair methods behind one interface (noop, zero_shot, accessguru)
+    model_client.py  cached, rate-limited model calls that stop cleanly at the daily quota
+    evaluate.py    the harness: scan, fix, re-scan, score, report
 scripts/
     fetch_resources.py   downloads pinned, checksum-verified resources into data/
     check_setup.py       tells you exactly what is missing
+splits/            the dev/test split (row ids), made once and committed
+results/           evaluation summaries, committed after each run (runs/ holds the full, ignored, output)
 examples/          a broken page (12 violated rules) and its hand-fixed version (0)
 tests/             pytest suite, run on Linux and Windows by GitHub Actions
 docs/              build plan and one explanatory guide per phase
