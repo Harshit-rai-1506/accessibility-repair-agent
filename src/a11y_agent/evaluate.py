@@ -121,7 +121,10 @@ async def evaluate_item(item: BenchmarkItem, method, scanner: Scanner, model: Mo
 # A whole run
 # ---------------------------------------------------------------------------
 
-def _outcome(row: dict) -> FixOutcome:
+def _outcome(row: dict, *, deletions_fail: bool = False) -> FixOutcome:
+    """The row's score; with ``deletions_fail``, a fix that removed content counts as no fix at all."""
+    if deletions_fail and row.get("dropped_content"):
+        return FixOutcome(row["rule_id"], row["old_score"], row["old_score"], False, row["introduced"])
     return FixOutcome(row["rule_id"], row["old_score"], row["new_score"], row["target_fixed"], row["introduced"])
 
 
@@ -141,6 +144,8 @@ def summarize_rows(rows: list[dict], *, method: str, model: str | None, dataset:
         "items_done": len(rows),
         "items_total": total_items,
         "all": summarize(_outcome(r) for r in scored),
+        # The metric alone rewards deleting the broken element; here a deletion scores as no fix.
+        "deletions_fail": summarize(_outcome(r, deletions_fail=True) for r in scored),
         "element_level": summarize(_outcome(r) for r in element_level),
         "by_category": {cat: summarize(_outcome(r) for r in scored if r["category"] == cat)
                         for cat in sorted({r["category"] for r in scored})},
@@ -249,16 +254,17 @@ def _fmt(x, pct=False) -> str:
 
 def report_table(summaries: list[dict]) -> str:
     """Markdown table comparing runs."""
-    head = ("| Method | Model | Items | Score decrease | Element-level only | Resolved | Broke something "
-            "| Dropped content | Too large | Tokens per item | Paid cost |")
-    lines = [head, "|" + "---|" * 11]
+    head = ("| Method | Model | Items | Score decrease | Deletions count as failures | Element-level only | Resolved "
+            "| Broke something | Dropped content | Too large | Tokens per item | Paid cost |")
+    lines = [head, "|" + "---|" * 12]
     for s in sorted(summaries, key=lambda s: (s["method"] != "noop", s["method"], s["model"] or "")):
         a, e = s["all"], s["element_level"]
+        strict = (s.get("deletions_fail") or {}).get("score_decrease")
         done = f"{s['items_done']}/{s['items_total']}" + ("" if s["complete"] else " (partial)")
         cost = "-" if s.get("paid_cost_usd") is None else f"${s['paid_cost_usd']:.2f}"
         lines.append(
             f"| {s['method']} | {(s['model'] or '-').split(':')[-1]} | {done} | {_fmt(a['score_decrease'])} "
-            f"| {_fmt(e['score_decrease'])} | {a['resolved']}/{a['violations']} | {a['introduced_new_violations']} "
+            f"| {_fmt(strict)} | {_fmt(e['score_decrease'])} | {a['resolved']}/{a['violations']} | {a['introduced_new_violations']} "
             f"| {s['dropped_content']} | {s['status'].get('too_large', 0)} | {s['tokens_per_item']} | {cost} |"
         )
     return "\n".join(lines)
@@ -272,8 +278,34 @@ def collect_runs(dataset: str, split: str) -> list[tuple[dict, list[dict]]]:
         results = summary_path.with_name("results.jsonl")
         rows = [json.loads(l) for l in results.read_text(encoding="utf-8").splitlines() if l.strip()] \
             if results.exists() else []
-        runs.append((json.loads(summary_path.read_text(encoding="utf-8")), rows))
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        if rows:      # re-score from the saved rows, so reports always use the current scoring code
+            summary = summarize_rows(rows, method=summary["method"], model=summary["model"],
+                                     dataset=summary["dataset"], split=summary["split"],
+                                     total_items=summary["items_total"])
+        runs.append((summary, rows))
     return runs
+
+
+ITEM_COLUMNS = ["id", "rule_id", "category", "page_level", "status", "old_score", "new_score", "target_fixed",
+                "resolved", "introduced", "dropped_content", "text_kept", "elements_kept", "passes", "calls",
+                "input_tokens", "output_tokens", "note", "trace"]
+
+
+def write_items_csv(path: Path, rows: list[dict], method: str) -> None:
+    """One line per item, for error analysis: outcome, cost, and (for the agent) its step trace.
+
+    No snippets or fixed pages: those stay in runs/ with the downloaded data.
+    """
+    import csv
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=ITEM_COLUMNS)
+        writer.writeheader()
+        for row in rows:
+            out = {k: row.get(k) for k in ITEM_COLUMNS if k not in ("introduced", "trace")}
+            out["introduced"] = ";".join(row.get("introduced") or [])
+            out["trace"] = (row.get("response") or "")[:3000] if method.startswith("agent") else ""
+            writer.writerow(out)
 
 
 def common_subset(runs: list[tuple[dict, list[dict]]]) -> tuple[set[str], list[dict]]:
@@ -365,15 +397,20 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(report_by_model(runs))
     if args.save:                                  # results/ always gets every model
-        summaries, table = [s for s, _ in all_runs], report_by_model(all_runs)
+        table = report_by_model(all_runs)
         target = RESULTS_DIR / f"{args.dataset}-{args.split}"
         target.mkdir(parents=True, exist_ok=True)
-        for s in summaries:
-            name = f"{s['method']}__{model_slug(s['model'])}.json"
-            (target / name).write_text(json.dumps(s, indent=2) + "\n", encoding="utf-8")
+        for s, rows in all_runs:
+            name = f"{s['method']}__{model_slug(s['model'])}"
+            (target / f"{name}.json").write_text(json.dumps(s, indent=2) + "\n", encoding="utf-8")
+            if rows:
+                write_items_csv(target / f"items__{name}.csv", rows, s["method"])
         (target / "README.md").write_text(
             f"# Results: {args.dataset} {args.split} split\n\n"
-            "Made with `python -m a11y_agent.evaluate report --save`. One JSON summary per run.\n\n"
+            "Made with `python -m a11y_agent.evaluate report --save`. One JSON summary per run, and "
+            "`items__*.csv` with one line per item (outcome, cost, and the agent's step trace).\n\n"
+            "*Deletions count as failures*: the same score, but a fix that removed more than a tenth of the "
+            "content scores as no fix.\n\n"
             + table + "\n", encoding="utf-8")
         print(f"\nSaved to {target.relative_to(ROOT)}")
     return 0

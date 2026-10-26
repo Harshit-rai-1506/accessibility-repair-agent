@@ -218,3 +218,23 @@ def test_report_compares_methods_only_within_a_model():
     groq, mistral = text.split("### mistral-small-2603")
     assert "### openai/gpt-oss-120b (groq)" in groq and "| zero_shot |" in groq and "| noop |" in groq
     assert "| zero_shot |" not in mistral and "| agent |" in mistral and "| noop |" in mistral
+
+
+def test_deletions_can_be_scored_as_failures_and_items_exported(tmp_path):
+    import csv
+
+    from a11y_agent.evaluate import summarize_rows, write_items_csv
+
+    base = {"rule_id": "image-alt", "category": "Syntax", "page_level": False, "status": "ok", "old_score": 5,
+            "introduced": [], "calls": 1, "cached_calls": 0, "input_tokens": 10, "output_tokens": 5,
+            "model_seconds": 0.1, "text_kept": 1.0, "elements_kept": 1.0, "passes": 1, "note": ""}
+    rows = [{**base, "id": "t-1", "new_score": 0, "target_fixed": True, "resolved": True, "dropped_content": False},
+            {**base, "id": "t-2", "new_score": 0, "target_fixed": True, "resolved": True, "dropped_content": True,
+             "elements_kept": 0.5, "response": "propose: 1 edit(s)\nverify: passed -> accept"}]
+    s = summarize_rows(rows, method="agent", model="fake:model", dataset="t", split="dev", total_items=2)
+    assert s["all"]["score_decrease"] == 1.0
+    assert s["deletions_fail"]["score_decrease"] == 0.5          # the deletion no longer counts as a fix
+    write_items_csv(tmp_path / "items.csv", rows, "agent")
+    lines = list(csv.DictReader(open(tmp_path / "items.csv", encoding="utf-8")))
+    assert [r["id"] for r in lines] == ["t-1", "t-2"] and lines[1]["dropped_content"] == "True"
+    assert "verify: passed" in lines[1]["trace"] and "fixed_html" not in lines[1]
