@@ -1,0 +1,59 @@
+{
+  "method": "accessguru",
+  "model": "groq:openai/gpt-oss-120b",
+  "dataset": "accessguru",
+  "split": "dev",
+  "complete": false,
+  "items_done": 14,
+  "items_total": 40,
+  "all": {
+    "violations": 14,
+    "score_decrease": 0.4,
+    "resolved": 6,
+    "target_fixed": 6,
+    "introduced_new_violations": 0,
+    "avg_old_score": 3.571,
+    "avg_new_score": 2.143
+  },
+  "element_level": {
+    "violations": 8,
+    "score_decrease": 0.25,
+    "resolved": 2,
+    "target_fixed": 2,
+    "introduced_new_violations": 0,
+    "avg_old_score": 4.0,
+    "avg_new_score": 3.0
+  },
+  "by_category": {
+    "Layout": {
+      "violations": 8,
+      "score_decrease": 0.25,
+      "resolved": 2,
+      "target_fixed": 2,
+      "introduced_new_violations": 0,
+      "avg_old_score": 4.0,
+      "avg_new_score": 3.0
+    },
+    "Syntax": {
+      "violations": 6,
+      "score_decrease": 0.6667,
+      "resolved": 4,
+      "target_fixed": 4,
+      "introduced_new_violations": 0,
+      "avg_old_score": 3.0,
+      "avg_new_score": 1.0
+    }
+  },
+  "status": {
+    "ok": 7,
+    "too_large": 7
+  },
+  "dropped_content": 3,
+  "calls": 55,
+  "input_tokens": 120039,
+  "output_tokens": 57015,
+  "model_seconds": 160.2,
+  "paid_cost_usd": 0.0522,
+  "axe_version": "4.12.1",
+  "tokens_per_item": 12647
+}
