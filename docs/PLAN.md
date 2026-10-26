@@ -282,7 +282,7 @@ model, tool-server security.
   (numbers in [04-retrieval.md](04-retrieval.md#7-measuring-retrieval-on-its-own)).
 - The agent: a `retrieve` node (once per rule) puts three W3C passages in the
   prompt; MCP tool `search_wcag`; method D `agent_rag` (agent_tools + retrieval).
-- Guide: [docs/04-retrieval.md](04-retrieval.md). 174 tests.
+- Guide: [docs/04-retrieval.md](04-retrieval.md). 176 tests.
 
 **Concepts:** chunking, embeddings, vector stores (and when not to use a
 database), metadata filtering, hybrid search, retrieval evaluation, context

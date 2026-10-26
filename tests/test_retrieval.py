@@ -3,8 +3,9 @@
 Most tests use HashEmbeddings, a tiny stand-in that needs no download, so
 they check the pipeline (chunking, the two rankings, fusion, filters, the
 evaluation) rather than the quality of meaning-based search. The tests
-marked ``embedding`` use the real bge-small model and run wherever it has
-been downloaded (CI does).
+marked ``embedding`` use the real bge-small model on a few sentences and run
+wherever it has been downloaded (CI does). Retrieval quality over the whole
+corpus is measured by ``python -m a11y_agent.retrieval eval``, not here.
 """
 
 import asyncio
@@ -123,12 +124,42 @@ def test_real_embeddings_capture_meaning():
 
 @pytest.mark.embedding
 @real_model
-def test_real_hybrid_retrieval_beats_keywords_alone(corpus):
-    """The headline Phase 4 claim, on the real model: fusing meaning and keywords helps."""
-    from a11y_agent.config import settings
-    # the project's own cache, so `python -m a11y_agent.retrieval` reuses these vectors afterwards
-    real = WcagIndex(chunk_documents(corpus),
-                     CachedEmbeddings(OnnxEmbeddings(), settings.data_dir / "index" / "embeddings.sqlite"))
-    report = evaluate(real)
-    print(report)
-    assert report["modes"]["hybrid"]["mrr@10"] >= report["modes"]["bm25"]["mrr@10"] - 0.02
+def test_real_embeddings_keep_the_order_of_their_inputs():
+    """Texts are batched by length inside the model; the vectors must still come back in order."""
+    model = OnnxEmbeddings(batch_size=2)
+    texts = ["contrast", "Using alt attributes on img elements to provide a text alternative for images.", "alt"]
+    together = model.embed_documents(texts)
+    one_by_one = [model.embed_documents([t])[0] for t in texts]
+    import numpy as np
+    assert np.allclose(together, one_by_one, atol=1e-4)
+
+
+# The headline claim on the real model (hybrid search ranks at least as well as
+# keywords alone) needs the whole corpus embedded, which takes minutes, so it is
+# not a unit test: CI runs `python -m a11y_agent.retrieval eval --check`.
+def test_the_retrieval_check_compares_hybrid_with_keywords():
+    from a11y_agent.retrieval import check_report
+
+    def report(hybrid, bm25):
+        return {"modes": {"hybrid": {"mrr@10": hybrid}, "bm25": {"mrr@10": bm25}}}
+    assert check_report(report(0.73, 0.71)) == ""
+    assert check_report(report(0.70, 0.71)) == ""                     # within the tolerance
+    assert "below" in check_report(report(0.60, 0.71))
+
+
+def test_cache_saves_each_part_as_it_goes(tmp_path):
+    class Breaks(HashEmbeddings):
+        calls = 0
+
+        def embed_documents(self, texts):
+            Breaks.calls += 1
+            if Breaks.calls == 2:
+                raise RuntimeError("stopped")                          # e.g. Ctrl+C halfway through
+            return super().embed_documents(texts)
+    cache = CachedEmbeddings(Breaks(), tmp_path / "e.sqlite")
+    cache.PART = 2
+    with pytest.raises(RuntimeError):
+        cache.embed_documents(["a", "b", "c", "d"])
+    again = CachedEmbeddings(HashEmbeddings(), tmp_path / "e.sqlite")
+    again.embed_documents(["a", "b", "c", "d"])
+    assert again.computed == 2                                         # "a" and "b" were kept

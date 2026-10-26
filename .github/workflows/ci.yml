@@ -49,16 +49,41 @@ jobs:
       - name: Download resources
         run: python scripts/fetch_resources.py
 
+      # The output is also saved to a file, so that if a test gets stuck, the next
+      # step can show where on the run page (pytest-timeout stops it after 10 minutes).
       - name: Run tests
-        run: python -m pytest -v --timeout=900 --durations=15
+        shell: bash
+        env:
+          PYTHONUNBUFFERED: "1"
+          PYTHONIOENCODING: utf-8
+        run: |
+          set -o pipefail
+          python -m pytest -v --timeout=600 --durations=15 2>&1 | tee pytest-output.txt
+
+      - name: Show where the tests stopped
+        if: failure()
+        shell: bash
+        run: |
+          python - <<'EOF'
+          from pathlib import Path
+          path = Path("pytest-output.txt")
+          lines = path.read_text(encoding="utf-8", errors="replace").splitlines() if path.exists() else ["(no output saved)"]
+          def escape(text):
+              return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          tests = [line for line in lines if line.startswith("tests/") and "::" in line]
+          print("::error title=Last tests started::" + escape("\n".join(tests[-8:])))
+          print("::error title=End of the test output::" + escape("\n".join(lines[-150:])[-8000:]))
+          EOF
 
       - name: Setup check (no API key in CI)
         run: python scripts/check_setup.py --skip-llm
 
-      # Retrieval quality with the real embedding model (Phase 4), shown as notices on the run page.
-      - name: Retrieval evaluation (Linux)
-        if: runner.os == 'Linux'
-        run: python -m a11y_agent.retrieval eval --annotate
+      # Retrieval quality with the real embedding model (Phase 4), shown as notices
+      # on the run page. --check fails the run if hybrid search ranks worse than
+      # keywords alone. On Windows this also shows how long embedding the corpus takes.
+      - name: Retrieval evaluation
+        timeout-minutes: 30
+        run: python -m a11y_agent.retrieval eval --annotate --check
 
       - name: Record resolved package versions
         if: always()

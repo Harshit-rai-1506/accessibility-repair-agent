@@ -309,6 +309,8 @@ def main(argv: list[str] | None = None) -> int:
     ev = sub.add_parser("eval", help="measure retrieval: hit@k and MRR per search mode")
     ev.add_argument("--save", action="store_true", help="write results/retrieval/")
     ev.add_argument("--annotate", action="store_true", help="also print GitHub Actions notices")
+    ev.add_argument("--check", action="store_true",
+                    help="exit with an error if hybrid search ranks worse than keywords alone (used in CI)")
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
@@ -316,8 +318,11 @@ def main(argv: list[str] | None = None) -> int:
     started = time.perf_counter()
     index = WcagIndex.build()
     computed = getattr(index.embeddings, "computed", 0)
-    print(f"{len(index.chunks)} chunks indexed in {time.perf_counter() - started:.1f} s "
-          f"({computed} newly embedded, the rest from the cache)")
+    built = (f"{len(index.chunks)} chunks indexed in {time.perf_counter() - started:.1f} s "
+             f"({computed} newly embedded, the rest from the cache)")
+    print(built)
+    if getattr(args, "annotate", False):
+        print(f"::notice title=retrieval index::{built}")
     if args.command == "build":
         return 0
     if args.command == "search":
@@ -345,7 +350,24 @@ def main(argv: list[str] | None = None) -> int:
             f"rule's criteria. {report['chunks']} chunks; embeddings: {report['embeddings']}; no criteria "
             "filter.\n\n" + table + "\n", encoding="utf-8")
         print(f"\nSaved to {RESULTS_DIR.relative_to(ROOT)}")
+    if args.check:
+        problem = check_report(report)
+        if problem:
+            print(f"::error title=retrieval check::{problem}" if args.annotate else f"\nCheck failed: {problem}")
+            return 1
+        print("\nCheck passed: hybrid search ranks at least as well as keywords alone.")
     return 0
+
+
+def check_report(report: dict, tolerance: float = 0.02) -> str:
+    """The Phase 4 claim, checked on every CI run: fusing meaning and keywords must not hurt.
+
+    Returns a description of the problem, or "" when the report is fine.
+    """
+    hybrid, bm25 = report["modes"]["hybrid"]["mrr@10"], report["modes"]["bm25"]["mrr@10"]
+    if hybrid < bm25 - tolerance:
+        return f"hybrid MRR@10 {hybrid} is below keyword-only {bm25} (tolerance {tolerance})"
+    return ""
 
 
 if __name__ == "__main__":

@@ -80,7 +80,11 @@ for searching relevant passages:", passages do not.
 
 Embedding the 2,357 chunks takes a few minutes on a laptop CPU, once: every
 vector is cached in `data/index/embeddings.sqlite`, so later runs load them
-in seconds.
+in seconds. Two details make that first build less painful. Texts are batched
+with others of similar length, because every text in a batch is padded to the
+longest one and padding is wasted work. And the cache saves every 256 vectors
+as it goes and prints progress, so a build stopped with Ctrl+C keeps what it
+finished and the next one carries on from there.
 
 ---
 
@@ -154,6 +158,15 @@ In the agent the search is also filtered to the rule's criteria, so every
 passage it sees belongs to the right criterion; the measurement above shows
 how well search works even without that help, and which mode ranks best.
 
+**Fusion only helps when both rankings are good.** The same evaluation with
+the tests' stand-in embedder (`A11Y_EMBEDDINGS=hash`, which only hashes
+words) gives dense MRR@10 0.39, and hybrid 0.64, *below* keywords alone (0.71):
+a poor ranking fused with a good one drags it down. So CI runs
+`python -m a11y_agent.retrieval eval --check` with the real model on every
+push, and the run fails if hybrid search ever ranks worse than keywords
+alone (by more than 0.02). That is a regression test for the retrieval
+design, not just for the code.
+
 ---
 
 ## 8. Retrieval in the agent
@@ -189,15 +202,18 @@ node calls it through the MCP session (`McpRetriever`), and in method
 that needs no download, and checks the pipeline: chunk sizes and metadata,
 link lists dropped, keyword search finding a technique by its id, criteria
 filters, fusion using both rankings, the LangChain retriever interface, the
-evaluation, and the embedding cache. Two tests marked `embedding` use the
-real model wherever it is downloaded (CI): related text must score higher,
-and hybrid search must not do worse than keywords alone.
+evaluation, the `--check` rule, and the embedding cache (including keeping the
+finished part of an interrupted build). Two tests marked `embedding` use the
+real model on a few sentences wherever it is downloaded (CI): related text
+must score higher, and vectors must come back in the order of their texts
+even though they are batched by length. Embedding the whole corpus takes
+minutes, so it is not a unit test; the CI step above does it.
 
 `tests/test_agent.py` checks that retrieved guidance reaches every attempt's
 prompt but is fetched once per rule, and that without a retriever nothing
 changes. `tests/test_mcp.py` checks the `search_wcag` tool and `agent_rag` in
-the evaluation harness. CI also runs the retrieval evaluation with the real
-model and shows the numbers on the run page.
+the evaluation harness. CI runs the retrieval evaluation with the real model
+on Linux and Windows and shows the numbers on the run page.
 
 ---
 

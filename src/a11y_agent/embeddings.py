@@ -18,7 +18,7 @@ Three classes, all LangChain ``Embeddings`` (``embed_documents`` and
 ``CachedEmbeddings``
     Wraps another embedder and stores every vector in SQLite, keyed by the
     model and the text. The corpus is embedded once (a few minutes on a laptop
-    CPU); later runs load the vectors in seconds.
+    CPU, saved as it goes); later runs load the vectors in seconds.
 
 ``HashEmbeddings``
     A tiny stand-in with no download: words are hashed into 256 buckets. It
@@ -32,6 +32,9 @@ import hashlib
 import os
 import re
 import sqlite3
+import sys
+import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -81,16 +84,19 @@ class OnnxEmbeddings(Embeddings):
 
     def _embed(self, texts: list[str]) -> np.ndarray:
         self._load()
-        out = []
-        for start in range(0, len(texts), self.batch_size):
-            encoded = self._tokenizer.encode_batch(texts[start:start + self.batch_size])
+        # Texts in a batch are padded to the longest one, so batching texts of
+        # similar length wastes less work; the vectors are put back in order after.
+        order = sorted(range(len(texts)), key=lambda i: len(texts[i]))
+        vectors = np.zeros((len(texts), self.dimensions), dtype=np.float32)
+        for start in range(0, len(order), self.batch_size):
+            batch = order[start:start + self.batch_size]
+            encoded = self._tokenizer.encode_batch([texts[i] for i in batch])
             feed = {"input_ids": np.array([e.ids for e in encoded], dtype=np.int64),
                     "attention_mask": np.array([e.attention_mask for e in encoded], dtype=np.int64)}
             if "token_type_ids" in self._inputs:
                 feed["token_type_ids"] = np.array([e.type_ids for e in encoded], dtype=np.int64)
             hidden = self._session.run(None, feed)[0]           # (batch, tokens, 384)
-            out.append(hidden[:, 0])                            # bge uses the first ([CLS]) token's vector
-        vectors = np.concatenate(out) if out else np.zeros((0, self.dimensions), dtype=np.float32)
+            vectors[batch] = hidden[:, 0]                       # bge uses the first ([CLS]) token's vector
         return vectors / np.linalg.norm(vectors, axis=1, keepdims=True).clip(min=1e-12)
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
@@ -126,16 +132,34 @@ class HashEmbeddings(Embeddings):
 
 
 class CachedEmbeddings(Embeddings):
-    """Remember every vector on disk, so the corpus is embedded only once."""
+    """Remember every vector on disk, so the corpus is embedded only once.
+
+    New texts are embedded in parts of ``PART`` and each part is saved as soon
+    as it is done, so an interrupted build (Ctrl+C) keeps what it finished. When
+    embedding is slow (the real model on a laptop), progress is printed to stderr.
+    """
+
+    PART = 256
+    QUIET_SECONDS = 5.0                                    # no progress lines for jobs faster than this
 
     def __init__(self, base: Embeddings, path: Path):
         self.base = base
         self.model_id = getattr(base, "model_id", type(base).__name__)
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.path) as db:
+        with self._db() as db:
             db.execute("CREATE TABLE IF NOT EXISTS vectors (key TEXT PRIMARY KEY, vector BLOB NOT NULL)")
         self.computed = 0                                  # how many texts were embedded (not cached) so far
+
+    @contextmanager
+    def _db(self):
+        """A connection that commits and is closed afterwards (``with sqlite3.connect()`` only commits)."""
+        db = sqlite3.connect(self.path, timeout=30)
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def _key(self, text: str) -> str:
         return hashlib.sha256(f"{self.model_id}\n{text}".encode("utf-8")).hexdigest()
@@ -143,19 +167,27 @@ class CachedEmbeddings(Embeddings):
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         keys = [self._key(t) for t in texts]
         found: dict[str, list[float]] = {}
-        with sqlite3.connect(self.path) as db:
+        with self._db() as db:
             for start in range(0, len(keys), 500):
                 part = keys[start:start + 500]
                 rows = db.execute(f"SELECT key, vector FROM vectors WHERE key IN ({','.join('?' * len(part))})", part)
                 found.update((k, np.frombuffer(v, dtype=np.float32).tolist()) for k, v in rows)
         missing = [(k, t) for k, t in zip(keys, texts) if k not in found]
-        if missing:
-            vectors = self.base.embed_documents([t for _, t in missing])
-            self.computed += len(missing)
-            with sqlite3.connect(self.path) as db:
+        started = time.perf_counter()
+        for start in range(0, len(missing), self.PART):
+            part = missing[start:start + self.PART]
+            vectors = self.base.embed_documents([t for _, t in part])
+            with self._db() as db:
                 db.executemany("INSERT OR REPLACE INTO vectors VALUES (?, ?)",
-                               [(k, np.asarray(v, dtype=np.float32).tobytes()) for (k, _), v in zip(missing, vectors)])
-            found.update((k, list(v)) for (k, _), v in zip(missing, vectors))
+                               [(k, np.asarray(v, dtype=np.float32).tobytes()) for (k, _), v in zip(part, vectors)])
+            found.update((k, list(v)) for (k, _), v in zip(part, vectors))
+            self.computed += len(part)
+            elapsed = time.perf_counter() - started
+            if elapsed > self.QUIET_SECONDS:
+                done = start + len(part)
+                left = elapsed / done * (len(missing) - done)
+                print(f"  embedded {done}/{len(missing)} texts in {elapsed:.0f} s (about {left:.0f} s left)",
+                      file=sys.stderr, flush=True)
         return [found[k] for k in keys]
 
     def embed_query(self, text: str) -> list[float]:

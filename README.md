@@ -112,7 +112,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 174 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 176 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
