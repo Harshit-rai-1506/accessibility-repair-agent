@@ -222,19 +222,39 @@ checkpointing, streaming and tracing, testing with fake models.
 [docs/02-agent.md §3](02-agent.md#3-the-graph)). *Remaining:* the first dev
 run with a real key (`evaluate run --method agent`).
 
-### Phase 3: MCP tools (about 3 hours)
+### Phase 3: MCP tools ✅ built
 
-**Build**
-- `mcp_server.py` (FastMCP): tools `scan_html`, `scan_url`,
-  `verify_fix(original, candidate, rule_id)`, `explain_rule(rule_id)`.
-- The agent loads these tools through `langchain-mcp-adapters` instead of
-  importing Python functions; `propose_fix` may call `explain_rule` itself.
-- Demo: the same server used from an MCP client such as Claude Desktop or the
-  MCP Inspector.
+**Built**
+- `mcp_server.py` (FastMCP, MCP SDK 1.x): tools `scan_html`, `scan_url`
+  (public addresses only), `verify_fix`, `explain_rule`, `contrast_fix`, with
+  typed input and output schemas and read-only annotations; resource
+  `axe-rule://{rule_id}`; prompt `repair_violation`; one browser per server
+  (lifespan); errors returned as error results; stdio and streamable HTTP.
+- `contrast.py`: the WCAG contrast formula and the closest passing colours,
+  checked against axe-core in a test. `verification.py`: one judgement of a
+  fix, shared by the agent's `verify` node and the `verify_fix` tool.
+- `mcp_client.py`: one stdio session per run; `McpScanner` for the graph's
+  scans; `explain_rule` and `contrast_fix` loaded with `langchain-mcp-adapters`
+  as tools the model may call.
+- Agent: a bounded tool loop inside `propose` (final answer = `submit_fix`
+  tool, `tool_choice` "required" then forced, 3 rounds, budget-aware, cached);
+  fallbacks for providers without forced tool choice; CLI `--tools`; method
+  `agent_tools`. The graph itself is unchanged.
+- `scripts/try_mcp.py`, an MCP check in `check_setup.py`, guide
+  [docs/03-mcp-tools.md](03-mcp-tools.md) (MCP Inspector and Claude desktop
+  app setup). 139 tests.
 
-**Concepts:** tool schemas, function calling, MCP client and server, stdio
-versus HTTP transport, returning errors to the model.
-**Done when:** the agent reaches the same dev-set score through MCP tools.
+**Measured while building:** the agent through MCP gives exactly the same
+results as in-process (test); tool definitions add about 500 tokens per
+request; for accessguru-004 the contrast tool suggests #00538f (7.06:1), which
+axe-core accepts.
+
+**Concepts:** tool schemas, function calling, MCP client and server, tools /
+resources / prompts, stdio versus HTTP transport, returning errors to the
+model, tool-server security.
+**Done when:** the agent reaches the same dev-set score through MCP tools
+(plumbing: ✅ identical results in tests); `agent_tools` measured on dev.
+*Remaining:* the dev runs of `agent` and `agent_tools`.
 
 ### Phase 4: Retrieval over WCAG (about 4 hours)
 

@@ -428,4 +428,4 @@ Move the scanner and a few helpers behind an **MCP server** (`scan_html`,
 a colour with a 7:1 contrast ratio is arithmetic a tool should do, not a
 language model). The agent then calls them as tools, deciding for itself when
 to look up a rule or compute a colour, and the same tools become usable from
-any MCP client.
+any MCP client. (Built: [docs/03-mcp-tools.md](03-mcp-tools.md).)

@@ -60,6 +60,39 @@ def proposal_format() -> dict:
     }
 
 
+SUBMIT_TOOL = "submit_fix"
+
+
+def submit_tool_spec() -> dict:
+    """The final answer offered as a tool, for the tool-calling agent (Phase 3).
+
+    When the model can also call other tools, the provider cannot enforce a
+    JSON schema on the reply at the same time. So the answer itself becomes a
+    tool, ``submit_fix``, whose arguments are a FixProposal: the model's
+    work ends when it calls it, and we validate the arguments with Pydantic.
+    """
+    from langchain_core.utils.function_calling import convert_to_openai_tool
+
+    spec = convert_to_openai_tool(FixProposal)
+    spec["function"]["name"] = SUBMIT_TOOL
+    spec["function"]["description"] = ("Submit your fix: a one or two sentence explanation and the edits. "
+                                       "Call this exactly once, when your fix is ready.")
+    return spec
+
+
+def proposal_from_args(args: dict) -> FixProposal:
+    """Validate the arguments of a ``submit_fix`` call."""
+    try:
+        proposal = FixProposal.model_validate(args)
+    except ValidationError as e:
+        first = e.errors()[0]
+        where = ".".join(str(p) for p in first["loc"]) or "the arguments"
+        raise ProposalError(f"Your submit_fix call did not match the required format ({where}: {first['msg']}).")
+    if not proposal.edits:
+        raise ProposalError("Your submit_fix call contained no edits. Give at least one edit that fixes the problem.")
+    return proposal
+
+
 class ProposalError(ValueError):
     """The reply could not be read as a FixProposal. The message is written for the model."""
 

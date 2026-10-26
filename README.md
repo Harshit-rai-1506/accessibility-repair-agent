@@ -5,10 +5,11 @@ and **proves each fix worked by re-scanning the page**. Built with LangGraph,
 an MCP tool server, retrieval over the official WCAG documentation, and
 guardrails. Runs on free, open-weight models.
 
-> **Status:** Phases 0 (setup), 1 (evaluation harness and baselines) and 2
-> (the LangGraph agent) are built and tested on Linux and Windows. Baseline
-> numbers on the dev set are in; the agent's first dev-set run is next.
-> See the [build plan](docs/PLAN.md).
+> **Status:** Phases 0–3 are built and tested on Linux and Windows: setup,
+> evaluation harness and baselines, the LangGraph agent, and an MCP tool
+> server the agent uses as a client. Baseline numbers on the dev set are in;
+> the agent's dev-set runs are next (1 of 40 items done before the free daily
+> quota ran out). See the [build plan](docs/PLAN.md).
 
 ## The problem
 
@@ -42,7 +43,8 @@ it is structured, and verify every fix by scanning again.
 |---|---|---|---|---|---|---|
 | Zero-shot prompt | 0.51 | 21/40 | 11 | 5 | 3 | 930 |
 | AccessGuru prompting (14/40 so far) | 0.40 | 6/14 | 0 | 3 | 7 | 12,647 |
-| **Our agent** (Phase 2) | *first run pending* | | | | | |
+| **Our agent** (Phase 2) | *run in progress (1/40: fixed in 1 call, 893 tokens)* | | | | | |
+| **Our agent with MCP tools** (Phase 3) | *pending* | | | | | |
 
 Score decrease is 1 − (violation score after ÷ before), from the AccessGuru
 paper: 1.0 means every target fixed with nothing broken. Full tables:
@@ -70,8 +72,11 @@ violation is gone, and a person approves the final diff.
 Built so far: the scan → propose → verify → retry loop as a LangGraph state
 machine ([docs/02-agent.md](docs/02-agent.md)). The model returns small JSON
 edits rather than a rewritten page; every fix is re-scanned and checked for
-deleted content, and failures are fed back for the next attempt. Retrieval,
-guardrails and approval come in Phases 4 and 5.
+deleted content, and failures are fed back for the next attempt. The scanner,
+fix checker, rule explanations and a WCAG contrast calculator are served by an
+MCP server; the agent uses it as a client, and the model can call tools while
+it works ([docs/03-mcp-tools.md](docs/03-mcp-tools.md)). Retrieval, guardrails
+and approval come in Phases 4 and 5.
 
 ## Quickstart
 
@@ -95,7 +100,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 116 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 139 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
@@ -108,6 +113,15 @@ python -m a11y_agent.agent page.html --thread my-page        # saves checkpoints
 python -m a11y_agent.agent --graph                           # the graph as a Mermaid diagram
 ```
 
+Use the MCP tool server (Phase 3):
+
+```bash
+python scripts/try_mcp.py                                    # start the server, list and call its tools (no key needed)
+python -m a11y_agent.mcp_server                              # stdio, for the MCP Inspector or Claude's desktop app
+python -m a11y_agent.mcp_server --http --port 8765           # streamable HTTP at http://127.0.0.1:8765/mcp
+python -m a11y_agent.agent examples/broken_page.html --tools # the agent as an MCP client, with model tools
+```
+
 Run the evaluation (Phases 1–2):
 
 ```bash
@@ -115,6 +129,7 @@ python -m a11y_agent.evaluate run --method noop              # harness check, no
 python -m a11y_agent.evaluate run --method zero_shot         # dev split, ~42K tokens
 python -m a11y_agent.evaluate run --method accessguru        # dev split, ~350K tokens: spans 2 days of free quota
 python -m a11y_agent.evaluate run --method agent             # dev split, roughly 60-120K tokens
+python -m a11y_agent.evaluate run --method agent_tools       # dev split, roughly 100-180K tokens
 python -m a11y_agent.evaluate report                         # compare everything run so far
 ```
 
@@ -123,8 +138,9 @@ re-running never pays twice. You can also run evaluations on GitHub instead
 of your laptop: see [docs/01-evaluation.md](docs/01-evaluation.md#9-running-it).
 
 Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
-[docs/01-evaluation.md](docs/01-evaluation.md) (evaluation) and
-[docs/02-agent.md](docs/02-agent.md) (the LangGraph agent).
+[docs/01-evaluation.md](docs/01-evaluation.md) (evaluation),
+[docs/02-agent.md](docs/02-agent.md) (the LangGraph agent) and
+[docs/03-mcp-tools.md](docs/03-mcp-tools.md) (MCP tools).
 
 ## Roadmap
 
@@ -133,7 +149,7 @@ Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 | 0 | Environment, pinned resources, LangChain document loaders, scanner, scoring, model client, CI | Ground truth, reproducibility, Documents | ✅ Done |
 | 1 | Fixed dev/test split, evaluation harness, zero-shot and AccessGuru baselines | Evals before agents, caching, rate limits | ✅ Done (dev numbers in) |
 | 2 | LangGraph agent: scan → fix → verify → retry, with state and checkpoints | Graphs, state, reducers, conditional edges, structured output, checkpoints | ✅ Built; dev run pending |
-| 3 | MCP server exposing the scanner and fix tools; agent calls them as a client | Tool calling, MCP | Planned |
+| 3 | MCP server exposing the scanner, fix checker, rule explanations and a contrast calculator; agent calls them as a client | MCP (tools, resources, prompts, stdio/HTTP), function calling | ✅ Built; dev run pending |
 | 4 | Retrieval over WCAG Understanding docs and Techniques | Chunking, embeddings, hybrid search, metadata filters | Planned |
 | 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | Planned |
 | 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, reporting | Planned |
@@ -157,9 +173,14 @@ src/a11y_agent/
     agent.py       the LangGraph agent: state, nodes, conditional edges, checkpoints, CLI
     edits.py       the model's JSON edits: schema, validation, all-or-nothing apply, excerpts of long pages
     content.py     did a fix keep the page's words and elements?
+    verification.py  one judgement of a fix, shared by the agent and the MCP tool
+    contrast.py    WCAG contrast ratio and the closest colours that pass
+    mcp_server.py  the MCP server (FastMCP): scan, verify, explain, contrast tools; a resource; a prompt
+    mcp_client.py  starts the server and connects: a remote scanner and LangChain tools for the model
 scripts/
     fetch_resources.py   downloads pinned, checksum-verified resources into data/
     check_setup.py       tells you exactly what is missing
+    try_mcp.py           a tiny MCP client: see the server's tools in action
 splits/            the dev/test split (row ids), made once and committed
 results/           evaluation summaries, committed after each run (runs/ holds the full, ignored, output)
 examples/          a broken page (12 violated rules) and its hand-fixed version (0)

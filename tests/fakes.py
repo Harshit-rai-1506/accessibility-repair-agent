@@ -155,3 +155,50 @@ def page_fixer(prompt: str) -> dict:
     if rule == "html-has-lang":
         return proposal(("<html>", '<html lang="en">'))
     return proposal((html[:20], html[:20]))          # changes nothing
+
+
+# ---------------------------------------------------------------------------
+# For the tool-calling agent (Phase 3): replies may call tools
+# ---------------------------------------------------------------------------
+
+def tool_call(name: str, args: dict, call_id: str = "call_1") -> AIMessage:
+    return AIMessage(content="", tool_calls=[{"name": name, "args": args, "id": call_id, "type": "tool_call"}],
+                     usage_metadata={"input_tokens": 300, "output_tokens": 30, "total_tokens": 330},
+                     response_metadata={"finish_reason": "tool_calls"})
+
+
+def submit(*edits: tuple[str, str], explanation: str = "Fixed it.") -> AIMessage:
+    return tool_call("submit_fix", proposal(*edits, explanation=explanation), "call_submit")
+
+
+class ToolModel(BaseChatModel):
+    """Fake model that can call tools.
+
+    Each reply is an AIMessage or a function ``f(messages) -> AIMessage`` (the
+    last one repeats). Every call's messages and ``tool_choice`` are recorded.
+    ``reject_required`` mimics a provider that refuses tool_choice="required".
+    """
+
+    replies: list = []
+    seen: list = []            # (messages, tool_choice) per call
+    calls: int = 0
+    reject_required: bool = False
+
+    @property
+    def _llm_type(self) -> str:
+        return "tool-fake"
+
+    def bind_tools(self, tools, *, tool_choice=None, **kwargs):
+        return self.bind(tools=tools, tool_choice=tool_choice, **kwargs)
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs: Any) -> ChatResult:
+        choice = kwargs.get("tool_choice")
+        if self.reject_required and choice == "required":
+            error = Exception("Error code: 400 - tool_choice 'required' is not supported for this model")
+            error.status_code = 400
+            raise error
+        self.calls += 1
+        self.seen.append((list(messages), choice))
+        reply = self.replies[min(self.calls - 1, len(self.replies) - 1)]
+        message = reply(messages) if callable(reply) else reply
+        return ChatResult(generations=[ChatGeneration(message=message.model_copy(deep=True))])

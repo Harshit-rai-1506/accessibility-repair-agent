@@ -18,7 +18,7 @@ on:
       method:
         description: Repair method
         type: choice
-        options: [agent, zero_shot, accessguru, noop]
+        options: [agent, agent_tools, zero_shot, accessguru, noop]
         default: agent
       split:
         description: Benchmark split (use test only for final numbers)

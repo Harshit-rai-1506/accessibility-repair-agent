@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import re
 import shutil
@@ -195,7 +196,9 @@ async def run_evaluation(method_name: str, items: list[BenchmarkItem], *, datase
     write_lock = asyncio.Lock()
     semaphore = asyncio.Semaphore(max(1, concurrency))
 
-    async with Scanner() as scanner:
+    # A method that needs setup (agent_tools starts the MCP server) is an async context manager.
+    lifecycle = method if hasattr(method, "__aenter__") else contextlib.nullcontext()
+    async with lifecycle, Scanner() as scanner:
         async def one(item: BenchmarkItem) -> None:
             nonlocal stop
             async with semaphore:

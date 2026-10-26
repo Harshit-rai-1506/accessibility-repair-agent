@@ -11,6 +11,8 @@ small interface is what makes the comparison fair: only the method changes.
                 one corrective re-prompt if the fix fails, best candidate kept
     agent       our LangGraph agent (Phase 2): JSON edits, verified by re-scanning,
                 retried with the scanner's feedback, up to 3 attempts
+    agent_tools the same agent as an MCP client (Phase 3): its scans run on the MCP
+                server, and the model may call explain_rule and contrast_fix
 """
 
 from __future__ import annotations
@@ -168,14 +170,18 @@ class AgentMethod:
             cls._graph = build_graph()            # no checkpointer: the harness saves results per item
         return cls._graph
 
+    def agent_context(self, ctx: FixContext):
+        from .agent import AgentContext
+        return AgentContext(scanner=ctx.scanner, model=ctx.model, max_attempts=self.max_attempts, max_rules=1)
+
     async def fix(self, item: BenchmarkItem, ctx: FixContext) -> FixResult:
-        from .agent import AgentContext, compact_scan, run_config
+        from .agent import compact_scan, run_config
 
         state = await self.graph().ainvoke(
             {"html": item.html, "targets": [item.rule_id], "scan": compact_scan(ctx.before)},
-            run_config(max_attempts=self.max_attempts, max_rules=1, run_name=f"agent:{item.id}",
+            run_config(max_attempts=self.max_attempts, max_rules=1, run_name=f"{self.name}:{item.id}",
                        tags=["a11y-agent", "evaluation"], metadata={"item": item.id, "rule": item.rule_id}),
-            context=AgentContext(scanner=ctx.scanner, model=ctx.model, max_attempts=self.max_attempts, max_rules=1),
+            context=self.agent_context(ctx),
         )
         calls = [CallRecord(**u) for u in state.get("usage", [])]
         outcome = next((o for o in state.get("outcomes", []) if o["rule_id"] == item.rule_id), {})
@@ -187,7 +193,41 @@ class AgentMethod:
                          passes=outcome.get("attempts", 0), note=f"{kind} after {outcome.get('attempts', 0)} attempt(s)")
 
 
-METHODS: dict[str, type] = {m.name: m for m in (NoOp, ZeroShot, AccessGuru, AgentMethod)}
+class AgentToolsMethod(AgentMethod):
+    """Method C with tools (Phase 3): the same graph, connected to the MCP server.
+
+    One server process serves the whole evaluation run (``async with`` opens
+    the connection before the first item and closes it after the last). The
+    agent's own scans go to the server's ``scan_html`` tool; the model may call
+    ``explain_rule`` and ``contrast_fix``. The harness still scores every fix
+    with its own, separate scanner.
+    """
+    name = "agent_tools"
+
+    def __init__(self):
+        self.server = None
+        self._connection = None
+
+    async def __aenter__(self):
+        from .mcp_client import connect
+        self._connection = connect()
+        self.server = await self._connection.__aenter__()
+        return self
+
+    async def __aexit__(self, *exc):
+        if self._connection is not None:
+            await self._connection.__aexit__(*exc)
+        self.server = self._connection = None
+
+    def agent_context(self, ctx: FixContext):
+        from .agent import AgentContext
+        if self.server is None:
+            raise RuntimeError("use 'async with' around agent_tools so the MCP server is running")
+        return AgentContext(scanner=self.server.scanner, model=ctx.model, max_attempts=self.max_attempts,
+                            max_rules=1, tools=self.server.model_tools())
+
+
+METHODS: dict[str, type] = {m.name: m for m in (NoOp, ZeroShot, AccessGuru, AgentMethod, AgentToolsMethod)}
 
 
 def get_method(name: str) -> Method:

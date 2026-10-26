@@ -139,6 +139,28 @@ def check_scanner() -> None:
            "the scanner ran but results look wrong; check AXE_VERSION in .env")
 
 
+def check_mcp_server() -> None:
+    """Start our MCP server as a separate process (as any MCP client would) and call one tool."""
+    try:
+        from a11y_agent.mcp_client import connect
+    except Exception as e:
+        report("MCP server", "FAIL", f"import failed ({e})", "run: pip install -e .")
+        return
+
+    async def run():
+        async with connect() as server:
+            result = await server.session.call_tool("contrast_fix", {"foreground": "#767676", "background": "#fff"})
+            return [t.name for t in server.tools], result.structuredContent["ratio"]
+
+    try:
+        names, ratio = asyncio.run(asyncio.wait_for(run(), timeout=60))
+    except Exception as e:
+        report("MCP server", "FAIL", (str(e).splitlines() or [type(e).__name__])[0][:160],
+               "try it directly: python -m a11y_agent.mcp_server   (errors are printed there)")
+        return
+    report("MCP server", "OK" if ratio == 4.54 else "FAIL", f"{len(names)} tools over stdio: {', '.join(names)}")
+
+
 def check_documents() -> None:
     try:
         from a11y_agent.loaders import AxeRuleLoader, BenchmarkLoader, WCAGLoader
@@ -229,6 +251,7 @@ def main() -> int:
     check_documents()
     check_split()
     check_scanner()
+    check_mcp_server()
     if args.skip_llm:
         report("Model config", "SKIP", "--skip-llm")
         report("Model call", "SKIP", "--skip-llm")
