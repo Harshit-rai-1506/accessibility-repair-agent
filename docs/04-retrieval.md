@@ -138,28 +138,31 @@ of WCAG.
 relevant chunk in the top *k*; *MRR@10* (mean reciprocal rank) averages
 1/rank of the first relevant chunk, so finding it first counts most.
 
-Measured in CI with the real model (2,357 chunks, 75 queries):
+Measured in CI with the real model (2,357 chunks, 75 queries; Linux and Windows gave identical numbers):
 
 | Search | hit@1 | hit@3 | hit@10 | MRR@10 |
 |---|---|---|---|---|
 | BM25 (keywords) | 0.59 | 0.80 | 0.91 | 0.71 |
-| Dense (bge-small embeddings) | 0.63 | 0.77 | 0.89 | 0.72 |
-| **Hybrid (RRF)** | **0.64** | **0.83** | **0.93** | **0.74** |
+| Dense (bge-small embeddings) | 0.60 | 0.77 | 0.89 | 0.70 |
+| **Hybrid (RRF)** | **0.64** | **0.84** | **0.91** | **0.74** |
 
 Reading it: keywords and embeddings are about equally good on their own,
-and fusing their rankings is best on three of the four measures.
+and fusing their rankings is best on every measure (tied with keywords on
+hit@10): the right criterion is in the top three for 84% of rules, against
+80% and 77%.
 The gains are a few points, not dramatic, which is typical when the queries
 use the same vocabulary as the documents (axe-core's help texts are written
-in WCAG's terms). Hybrid search is kept because it is never clearly worse
-here and it is the safer choice for queries that do not share that vocabulary.
+in WCAG's terms). Hybrid search is kept: it ranks best here, and it is the
+safer choice for queries that do not share that vocabulary.
 
 **How much a few points mean.** With 75 queries, one query is 1.3 points of
-hit@k, so differences of 2–3 points are a couple of queries. Even the vectors
-move a little: the 8-bit model scales its numbers per batch, and when the
-batching changed (texts grouped by length, section 3), dense hit@3 went from
-0.79 to 0.77 and hit@1 from 0.60 to 0.63 with nothing else changed. Treat
-differences of this size as noise; the check below uses a 0.02 tolerance for
-that reason.
+hit@k, so differences of 2–3 points are a couple of queries. The dense
+numbers also move a little from machine to machine: BM25 gave exactly the
+same scores in every CI run, but the same code gave dense MRR@10 0.72 on one
+CI machine and 0.70 on another, because the 8-bit model's arithmetic differs
+slightly between CPU types (and with how texts are batched, section 3). Over
+four CI runs hybrid MRR@10 stayed between 0.73 and 0.74. Treat differences of
+this size as noise; the check below uses a 0.02 tolerance for that reason.
 
 In the agent the search is also filtered to the rule's criteria, so every
 passage it sees belongs to the right criterion; the measurement above shows
