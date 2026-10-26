@@ -249,7 +249,7 @@ Rule: {help}. {description}
 WCAG success criteria: {criteria}
 
 {elements_header}, each with the checker's explanation:
-{elements}
+{elements}{guidance}
 
 {html_label}
 ```html
@@ -302,14 +302,31 @@ def _indent(text: str, prefix: str = "   ") -> str:
     return "\n".join(prefix + line for line in text.strip().splitlines())
 
 
+AGENT_GUIDANCE = """
+
+Guidance from the W3C's WCAG documents, retrieved for this rule (use it if it helps; your rules still apply):
+{passages}"""
+
+
+def guidance_text(guidance: list[dict]) -> str:
+    """Retrieved passages as numbered blocks, each with its title, section and link."""
+    blocks = []
+    for i, g in enumerate(guidance, start=1):
+        where = g["title"] + (f" — {g['section']}" if g.get("section") else "")
+        blocks.append(f"[{i}] {where} ({g.get('url', '')})\n{g['text']}")
+    return AGENT_GUIDANCE.format(passages="\n\n".join(blocks)) if blocks else ""
+
+
 def agent_messages(violation: dict, html: str, *, excerpted: bool = False,
-                   feedback: list[dict] | None = None, tools: bool = False) -> list[tuple[str, str]]:
+                   feedback: list[dict] | None = None, tools: bool = False,
+                   guidance: list[dict] | None = None) -> list[tuple[str, str]]:
     """The agent's request for one violation.
 
     ``violation`` is one entry of the agent's compact scan (rule_id, impact,
     help, criteria, node_count, nodes); ``feedback`` lists earlier attempts as
     ``{"attempt", "edits", "problem"}``. With ``tools=True`` the system prompt
     describes the tools (Phase 3) instead of the JSON reply format.
+    ``guidance`` are WCAG passages found by retrieval (Phase 4).
     """
     rule_id = violation["rule_id"]
     try:
@@ -332,7 +349,7 @@ def agent_messages(violation: dict, html: str, *, excerpted: bool = False,
         description=description, criteria=", ".join(violation.get("criteria") or []) or "best practice",
         elements_header=_elements_header(len(violation["nodes"]), violation.get("node_count", len(violation["nodes"]))),
         elements=elements, html_label=AGENT_EXCERPT_LABEL if excerpted else AGENT_HTML_LABEL,
-        html=html, history=history,
+        html=html, history=history, guidance=guidance_text(guidance or []),
     )
     return [("system", AGENT_SYSTEM_TOOLS if tools else AGENT_SYSTEM), ("human", user)]
 

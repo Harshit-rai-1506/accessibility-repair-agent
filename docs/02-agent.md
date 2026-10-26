@@ -72,6 +72,7 @@ graph TD;
 	__start__([<p>__start__</p>]):::first
 	scan(scan)
 	pick(pick)
+	retrieve(retrieve)
 	propose(propose)
 	verify(verify)
 	accept(accept)
@@ -81,10 +82,11 @@ graph TD;
 	__start__ --> scan;
 	accept --> pick;
 	give_up --> pick;
-	pick -. &nbsp;next rule&nbsp; .-> propose;
 	pick -. &nbsp;all done&nbsp; .-> report;
+	pick -. &nbsp;next rule&nbsp; .-> retrieve;
 	propose -. &nbsp;give up&nbsp; .-> give_up;
 	propose -. &nbsp;edits applied&nbsp; .-> verify;
+	retrieve --> propose;
 	scan --> pick;
 	verify -. &nbsp;passed&nbsp; .-> accept;
 	verify -. &nbsp;give up&nbsp; .-> give_up;
@@ -104,6 +106,8 @@ In words, for a whole page:
 
 1. **scan** the page once; queue every violated rule, most severe first.
 2. **pick** the next rule (skipping rules an earlier fix already solved).
+   (**retrieve**, added in Phase 4, then looks up W3C guidance for that rule
+   when a retriever is configured; otherwise it does nothing.)
 3. **propose**: ask the model for edits, apply them to a copy of the page.
 4. **verify**: scan the copy. Passed → **accept** it and go back to *pick*.
    Failed with attempts left → *propose* again, with the reason. Failed and

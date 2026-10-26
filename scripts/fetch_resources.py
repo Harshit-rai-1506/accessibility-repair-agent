@@ -2,7 +2,7 @@
 
 Run from the repository root:
 
-    python scripts/fetch_resources.py                 # everything (about 30 MB)
+    python scripts/fetch_resources.py                 # everything (about 65 MB)
     python scripts/fetch_resources.py --only axe benchmark
     python scripts/fetch_resources.py --full-benchmark   # also the 20 MB full dataset
 
@@ -12,6 +12,9 @@ What gets downloaded (into data/, which git ignores):
     benchmark  AccessGuru benchmark CSVs + the ACCESS (Huang et al. 2024) set
     wcag       W3C WCAG 2.2 "Understanding" and "Techniques" pages (RAG corpus)
     axe-rules  axe-core rule metadata: rule -> WCAG criterion, impact, help text
+    embedding-model
+               bge-small-en-v1.5 (BAAI, MIT), int8 ONNX, 34 MB: turns text into vectors
+               on your CPU for retrieval (Phase 4), SHA-256 checked
 
 Every source is pinned to an exact version or commit so results are
 reproducible. The axe-core file and the benchmark files also have known
@@ -87,6 +90,16 @@ WCAG_PATHS = [
     "techniques/text/",
 ]
 
+# Embedding model for retrieval (Phase 4): BAAI's bge-small-en-v1.5 (MIT), as the
+# 8-bit quantised ONNX conversion published by Xenova. 34 MB instead of 133 MB, and
+# about 1.6 times faster on a laptop CPU, with nearly identical similarities.
+EMBEDDING_REPO = "Xenova/bge-small-en-v1.5"
+EMBEDDING_REVISION = "ea104dacec62c0de699686887e3f920caeb4f3e3"
+EMBEDDING_FILES = {    # file in the repository -> SHA-256
+    "onnx/model_quantized.onnx": "6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4",
+    "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+}
+
 AXE_REPO = "dequelabs/axe-core"
 AXE_RULES_PATHS = ["lib/rules/", "locales/_template.json"]
 
@@ -95,6 +108,7 @@ LICENSES = {
     "benchmark": "AccessGuru dataset CC BY 4.0, code MIT (Fathallah, Hernández, Staab, ASSETS 2025)",
     "wcag": "W3C Document License",
     "axe-rules": "MPL-2.0 (Deque Systems)",
+    "embedding-model": "MIT (BAAI bge-small-en-v1.5; ONNX conversion by Xenova)",
 }
 
 
@@ -269,6 +283,21 @@ def fetch_axe(force: bool, method: str) -> dict:
     }
 
 
+def fetch_embedding_model(force: bool, method: str) -> dict:
+    dest_dir = DATA / "models" / "bge-small-en-v1.5"
+    files = {}
+    for name, expected in EMBEDDING_FILES.items():
+        dest = dest_dir / Path(name).name
+        if not force and is_current(dest, expected):
+            log(f"  = already present: {dest.relative_to(ROOT)}")
+        else:
+            url = f"https://huggingface.co/{EMBEDDING_REPO}/resolve/{EMBEDDING_REVISION}/{name}"
+            write_verified(http_get(url, timeout=300), dest, expected)
+            log(f"  + downloaded {dest.relative_to(ROOT)}")
+        files[str(dest.relative_to(DATA))] = expected
+    return {"source": f"huggingface:{EMBEDDING_REPO}@{EMBEDDING_REVISION}", "files": files}
+
+
 def fetch_benchmark(force: bool, method: str, full: bool) -> dict:
     files = dict(BENCHMARK_FILES)
     if full:
@@ -324,7 +353,7 @@ def fetch_tree(repo: str, ref: str, paths: list[str], dest: Path, force: bool, m
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--only", nargs="+", choices=["axe", "benchmark", "wcag", "axe-rules"],
+    parser.add_argument("--only", nargs="+", choices=["axe", "benchmark", "wcag", "axe-rules", "embedding-model"],
                         help="fetch only these resources (default: all)")
     parser.add_argument("--full-benchmark", action="store_true", help="also fetch the 20 MB full dataset (3,524 rows)")
     parser.add_argument("--force", action="store_true", help="re-download even if files are present")
@@ -332,7 +361,7 @@ def main() -> int:
                         help="how to download GitHub content (default: try both)")
     args = parser.parse_args()
 
-    wanted = args.only or ["axe", "benchmark", "wcag", "axe-rules"]
+    wanted = args.only or ["axe", "benchmark", "wcag", "axe-rules", "embedding-model"]
     DATA.mkdir(parents=True, exist_ok=True)
     manifest_path = DATA / "MANIFEST.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
@@ -344,6 +373,7 @@ def main() -> int:
                                    DATA / "corpus" / "wcag", args.force, args.method),
         "axe-rules": lambda: fetch_tree(AXE_REPO, f"v{AXE_VERSION}", AXE_RULES_PATHS,
                                         DATA / "corpus" / "axe-rules", args.force, args.method),
+        "embedding-model": lambda: fetch_embedding_model(args.force, args.method),
     }
 
     failures = 0

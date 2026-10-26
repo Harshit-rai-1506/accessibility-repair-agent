@@ -67,7 +67,7 @@ def test_server_offers_tools_resources_and_prompts():
         return tools, templates, prompts, scan, verify, deleted, contrast, unknown, private, resource
 
     tools, templates, prompts, scan, verify, deleted, contrast, unknown, private, resource = with_server(work)
-    assert set(tools) == {"scan_html", "scan_url", "verify_fix", "explain_rule", "contrast_fix"}
+    assert set(tools) == {"scan_html", "scan_url", "verify_fix", "explain_rule", "contrast_fix", "search_wcag"}
     assert tools["scan_html"].annotations.readOnlyHint is True
     assert "html" in tools["scan_html"].inputSchema["required"] and tools["scan_html"].outputSchema
     assert templates == ["axe-rule://{rule_id}"] and prompts == ["repair_violation"]
@@ -229,3 +229,37 @@ def test_the_same_server_over_http():
     finally:
         server.terminate()
         server.wait(timeout=10)
+
+
+@pytest.fixture
+def hash_embeddings(monkeypatch):
+    """The server builds its index with the download-free test embedder."""
+    monkeypatch.setenv("A11Y_EMBEDDINGS", "hash")
+
+
+def test_search_wcag_tool(hash_embeddings):
+    async def work(server):
+        tools = {t.name for t in (await server.session.list_tools()).tools}
+        result = await server.session.call_tool("search_wcag", {"query": "alt attributes on img elements",
+                                                                "success_criteria": ["1.1.1"], "k": 3})
+        guidance = await server.retriever.guidance("Images must have alternative text", ["1.1.1"], 2)
+        return tools, result, guidance
+    tools, result, guidance = with_server(work)
+    assert "search_wcag" in tools
+    passages = result.structuredContent["passages"]
+    assert len(passages) == 3 and all("1.1.1" in p["sc"].split(",") for p in passages)
+    assert len(guidance) == 2 and all(p["doc_type"] in ("technique", "failure", "understanding") for p in guidance)
+
+
+def test_agent_rag_as_an_evaluation_method(tmp_path, hash_embeddings):
+    def by_rule(messages):
+        assert "Guidance from the W3C" in messages[1].content          # retrieval ran before the first attempt
+        return submit(('<img src="cat.png">', '<img src="cat.png" alt="A cat">'))
+    items = [BenchmarkItem(id="t-001", dataset="t", rule_id="image-alt", category="Syntax", impact="critical",
+                           url="https://example.com", description="", html='<img src="cat.png">')]
+    llm = ToolModel(replies=[by_rule])
+    summary = asyncio.run(run_evaluation("agent_rag", items, dataset="t", split="dev", model_spec="fake:model",
+                                         out_dir=tmp_path / "agent_rag", llm=llm, cache=ResponseCache(tmp_path / "c.sqlite"),
+                                         limiter=RateLimiter(), quiet=True))
+    assert summary["all"]["score_decrease"] == 1.0
+    assert "search_wcag" in llm.offered[0] and "contrast_fix" in llm.offered[0]

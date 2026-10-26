@@ -13,6 +13,8 @@ small interface is what makes the comparison fair: only the method changes.
                 retried with the scanner's feedback, up to 3 attempts
     agent_tools the same agent as an MCP client (Phase 3): its scans run on the MCP
                 server, and the model may call explain_rule and contrast_fix
+    agent_rag   agent_tools plus retrieval over the WCAG documents (Phase 4): W3C
+                guidance in the prompt, and a search_wcag tool
 """
 
 from __future__ import annotations
@@ -227,7 +229,26 @@ class AgentToolsMethod(AgentMethod):
                             max_rules=1, tools=self.server.model_tools())
 
 
-METHODS: dict[str, type] = {m.name: m for m in (NoOp, ZeroShot, AccessGuru, AgentMethod, AgentToolsMethod)}
+class AgentRagMethod(AgentToolsMethod):
+    """Method D (Phase 4): the MCP agent with retrieval over the WCAG documents.
+
+    Before the first attempt on a rule, the graph's ``retrieve`` node fetches
+    three W3C passages for the rule's success criteria (through the server's
+    ``search_wcag`` tool) and puts them in the prompt; the model may also call
+    ``search_wcag`` itself.
+    """
+    name = "agent_rag"
+
+    def agent_context(self, ctx: FixContext):
+        from .mcp_client import RAG_TOOLS
+        context = super().agent_context(ctx)
+        context.tools = self.server.model_tools(RAG_TOOLS)
+        context.retriever = self.server.retriever
+        return context
+
+
+METHODS: dict[str, type] = {m.name: m for m in (NoOp, ZeroShot, AccessGuru, AgentMethod, AgentToolsMethod,
+                                                AgentRagMethod)}
 
 
 def get_method(name: str) -> Method:

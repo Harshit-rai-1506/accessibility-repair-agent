@@ -183,6 +183,7 @@ class ToolModel(BaseChatModel):
 
     replies: list = []
     seen: list = []            # (messages, tool_choice) per call
+    offered: list = []         # names of the tools offered, per call
     calls: int = 0
     reject_required: bool = False
 
@@ -201,6 +202,7 @@ class ToolModel(BaseChatModel):
             raise error
         self.calls += 1
         self.seen.append((list(messages), choice))
+        self.offered.append([t["function"]["name"] for t in kwargs.get("tools", [])])
         reply = self.replies[min(self.calls - 1, len(self.replies) - 1)]
         message = reply(messages) if callable(reply) else reply
         return ChatResult(generations=[ChatGeneration(message=message.model_copy(deep=True))])

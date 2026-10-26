@@ -258,6 +258,41 @@ def test_feedback_says_how_to_pass_a_newly_broken_rule():
     assert 'To pass "link-name": Element has text that is visible to screen readers' in llm.prompts[1]
 
 
+class FakeRetriever:
+    def __init__(self):
+        self.queries = []
+
+    async def guidance(self, query, criteria, k=3):
+        self.queries.append((query, criteria))
+        return [{"title": "Using alt attributes on img elements", "section": "Description", "technique_id": "H37",
+                 "url": "https://www.w3.org/WAI/WCAG22/Techniques/html/H37", "doc_type": "technique",
+                 "sc": "1.1.1", "text": "Specify a short text alternative with the alt attribute."}]
+
+
+def test_retrieved_guidance_reaches_the_prompt_once_per_rule():
+    retriever = FakeRetriever()
+    llm = EditModel(replies=[BREAKS_LINK, FIX_IMG])
+    model = ModelClient("fake:model", llm=llm, limiter=RateLimiter(), max_request_tokens=0)
+
+    async def go():
+        async with Scanner() as scanner:
+            return await build_graph().ainvoke({"html": IMG_ONLY, "targets": ["image-alt"]}, run_config(),
+                                               context=AgentContext(scanner=scanner, model=model, retriever=retriever))
+    state = asyncio.run(go())
+    assert outcome(state, "image-alt")["status"] == "fixed"
+    assert len(retriever.queries) == 1                               # once per rule, not per attempt
+    query, criteria = retriever.queries[0]
+    assert criteria == ["1.1.1"] and "alternative text" in query.lower()
+    assert all("Guidance from the W3C" in p and "H37" in p for p in llm.prompts)
+    assert any(s["node"] == "retrieve" for s in state["steps"])
+
+
+def test_without_a_retriever_nothing_is_retrieved():
+    state, llm = run_agent(IMG_ONLY, [FIX_IMG], targets=["image-alt"])
+    assert not any(s["node"] == "retrieve" for s in state["steps"])
+    assert "Guidance from the W3C" not in llm.prompts[0]
+
+
 def test_per_rule_log_reducer():
     assert per_rule_log(["a"], ["b"]) == ["a", "b"]
     assert per_rule_log(["a"], None) == []
@@ -265,8 +300,8 @@ def test_per_rule_log_reducer():
 
 
 def test_recursion_limit_covers_the_worst_case():
-    # 25 rules x (pick + 3 x (propose + verify) + accept/give_up) + scan, last pick, report
-    assert recursion_limit(3, 25) >= 25 * 8 + 3
+    # 25 rules x (pick + retrieve + 10 x (propose + verify) + accept/give_up) + scan, last pick, report
+    assert recursion_limit(3, 25) >= 25 * (3 + 2 * 10) + 3
 
 
 def test_new_error_kinds():

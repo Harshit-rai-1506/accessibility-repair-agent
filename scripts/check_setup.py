@@ -30,7 +30,8 @@ PACKAGES = [
     ("langchain_ollama", "local models (optional)"),
     ("mcp", "Model Context Protocol"),
     ("langchain_mcp_adapters", "MCP tools in LangChain"),
-    ("chromadb", "vector store"),
+    ("onnxruntime", "embedding model runtime"),
+    ("tokenizers", "embedding model tokenizer"),
     ("rank_bm25", "keyword search"),
     ("bs4", "HTML parsing"),
     ("pandas", "benchmark tables"),
@@ -104,6 +105,13 @@ def check_resources() -> None:
         else:
             parts.append(f"{label} {n} files")
 
+    model = fr.DATA / "models" / "bge-small-en-v1.5"
+    bad = [n for n, h in fr.EMBEDDING_FILES.items() if not fr.is_current(model / n.split("/")[-1], h)]
+    if bad:
+        problems.append("embedding model missing or changed")
+    else:
+        parts.append("embedding model")
+
     if problems:
         report("Resources", "FAIL", "; ".join(problems), "run: python scripts/fetch_resources.py")
     else:
@@ -138,6 +146,23 @@ def check_scanner() -> None:
            f"broken example: {len(broken.violations)} rules violated (score {violation_score(broken)}); "
            f"fixed example: {len(fixed.violations)}",
            "the scanner ran but results look wrong; check AXE_VERSION in .env")
+
+
+def check_embeddings() -> None:
+    """Load the embedding model and embed two sentences (about a second)."""
+    try:
+        from a11y_agent.embeddings import OnnxEmbeddings
+        model = OnnxEmbeddings()
+        query = model.embed_query("images must have alternative text")
+        near, far = (sum(a * b for a, b in zip(query, v)) for v in model.embed_documents([
+            "H37: Using alt attributes on img elements. The objective of this technique is to provide a text alternative.",
+            "G18: Ensuring that a contrast ratio of at least 4.5:1 exists between text and background."]))
+    except Exception as e:
+        report("Embeddings", "FAIL", str(e).splitlines()[0][:160],
+               "run: python scripts/fetch_resources.py --only embedding-model")
+        return
+    report("Embeddings", "OK" if near > far else "FAIL",
+           f"{len(query)} dimensions; related text scores higher ({near:.2f} vs {far:.2f})")
 
 
 def check_mcp_server() -> None:
@@ -259,6 +284,7 @@ def main() -> int:
     check_documents()
     check_split()
     check_scanner()
+    check_embeddings()
     check_mcp_server()
     if args.skip_llm:
         report("Model config", "SKIP", "--skip-llm")

@@ -4,7 +4,7 @@ and proves every fix by scanning again.
 The graph (``python -m a11y_agent.agent --graph`` prints it as Mermaid):
 
     START -> scan -> pick
-    pick     --next rule-->      propose    or  --all done--> report -> END
+    pick     --next rule-->      retrieve -> propose    or  --all done--> report -> END
     propose  --edits applied-->  verify     or  --retry--> propose   or  --give up--> give_up
     verify   --passed-->         accept     or  --retry--> propose   or  --give up--> give_up
     accept -> pick               give_up -> pick
@@ -34,6 +34,7 @@ Usage:
     python -m a11y_agent.agent page.html --rules image-alt link-name     # only these rules
     python -m a11y_agent.agent page.html --thread my-page                # saved checkpoints: resume after a stop
     python -m a11y_agent.agent page.html --tools                         # as an MCP client, with model tools
+    python -m a11y_agent.agent page.html --rag                           # ... plus WCAG guidance (Phase 4)
     python -m a11y_agent.agent --graph                                   # print the graph (Mermaid)
 """
 
@@ -123,6 +124,7 @@ class AgentState(TypedDict, total=False):
     candidate: dict | None        # the latest proposed fix and, after verify, its result
     verdict: str                  # verify's decision: accept | retry | give_up
     stop_reason: str              # why the current rule cannot continue, e.g. "too_large"
+    guidance: list[dict]          # WCAG passages retrieved for the current rule (Phase 4)
     feedback: Annotated[list[dict], per_rule_log]     # what went wrong, shown to the model on retry
     candidates: Annotated[list[dict], per_rule_log]   # verified fixes for the current rule
     # Results (grow for the whole run)
@@ -147,6 +149,7 @@ class AgentContext:
     max_rules: int = MAX_RULES
     tools: list | None = None
     max_total_attempts: int = MAX_TOTAL_ATTEMPTS
+    retriever: Any = None         # anything with async guidance(query, criteria, k) -> [passage]; None = no retrieval
 
     def out_of_tries(self, attempt: int, stalls: int) -> bool:
         """Stop after ``max_attempts`` tries without progress, or ``max_total_attempts`` in all.
@@ -248,10 +251,38 @@ async def pick(state: AgentState) -> dict:
     rule = queue.pop(0)
     return {
         "queue": queue, "rule": rule, "attempt": 0, "stalls": 0, "candidate": None, "verdict": "", "stop_reason": "",
+        "guidance": [],
         "feedback": None, "candidates": None,            # None = clear (see per_rule_log)
         "outcomes": outcomes,
         "steps": _step("pick", f"next rule: {rule}", rule=rule),
     }
+
+
+GUIDANCE_PASSAGES = 3
+
+
+def retrieval_query(violation: dict) -> str:
+    """What to look up for a violation: the rule's help text plus axe-core's first failure message."""
+    first = " ".join((violation["nodes"][0].get("summary") or "").split())[:300] if violation["nodes"] else ""
+    return f"{violation.get('help', violation['rule_id'])}. {first}".strip()
+
+
+async def retrieve(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
+    """Look up W3C guidance for the current rule, once per rule (Phase 4).
+
+    The search is limited to the rule's WCAG success criteria (when it has
+    any) and to technique, failure and understanding pages. Without a
+    retriever in the runtime context this node does nothing.
+    """
+    retriever = runtime.context.retriever
+    if retriever is None:
+        return {}
+    violation = find_violation(state["scan"], state["rule"])
+    passages = await retriever.guidance(retrieval_query(violation), violation.get("criteria") or None,
+                                        GUIDANCE_PASSAGES)
+    found = "; ".join((p.get("technique_id") + " " if p.get("technique_id") else "") + p["title"][:70]
+                      for p in passages) or "nothing"
+    return {"guidance": passages, "steps": _step("retrieve", f"{len(passages)} passage(s): {found}", rule=state["rule"])}
 
 
 def build_request(state: AgentState, violation: dict, model: ModelClient,
@@ -263,18 +294,20 @@ def build_request(state: AgentState, violation: dict, model: ModelClient,
     prompt and a minimum reply budget, only the parts around the failing
     elements are shown. With tools, room is also kept for a few tool results.
     """
-    html, feedback = state["current_html"], state.get("feedback") or []
+    html, feedback, guidance = state["current_html"], state.get("feedback") or [], state.get("guidance") or []
     tools = bool(tool_specs)
     low, high = OUTPUT_TOKENS[0], reply_budget(violation, model)
     limit = int(model.max_request_tokens * BUDGET_MARGIN) if model.max_request_tokens else 0
     shown, excerpted = html, False
     if limit:
         reserve = tools_tokens(tool_specs or []) + (TOOL_RESULTS_RESERVE if tools else 0)
-        overhead = messages_tokens(agent_messages(violation, "", feedback=feedback, excerpted=True, tools=tools))
+        overhead = messages_tokens(agent_messages(violation, "", feedback=feedback, excerpted=True, tools=tools,
+                                                  guidance=guidance))
         html_tokens = max(limit - overhead - reserve - low, 300)
         if estimate_tokens(html) > html_tokens:
             shown, excerpted = focus_html(html, [n["html"] for n in violation["nodes"]], html_tokens * 4)
-    messages = agent_messages(violation, shown, feedback=feedback, excerpted=excerpted, tools=tools)
+    messages = agent_messages(violation, shown, feedback=feedback, excerpted=excerpted, tools=tools,
+                              guidance=guidance)
     used = messages_tokens(messages) + tools_tokens(tool_specs or [])
     max_tokens = high if not limit else max(low, min(high, limit - used))
     return messages, max_tokens, excerpted
@@ -572,12 +605,13 @@ def after_verify(state: AgentState) -> str:
 def build_graph(checkpointer=None):
     """Assemble and compile the graph. Pass a checkpointer to save state after every step."""
     graph = StateGraph(AgentState, context_schema=AgentContext)
-    for name, fn in [("scan", scan), ("pick", pick), ("propose", propose), ("verify", verify),
-                     ("accept", accept), ("give_up", give_up), ("report", report)]:
+    for name, fn in [("scan", scan), ("pick", pick), ("retrieve", retrieve), ("propose", propose),
+                     ("verify", verify), ("accept", accept), ("give_up", give_up), ("report", report)]:
         graph.add_node(name, fn)
     graph.add_edge(START, "scan")
     graph.add_edge("scan", "pick")
-    graph.add_conditional_edges("pick", after_pick, {"next rule": "propose", "all done": "report"})
+    graph.add_conditional_edges("pick", after_pick, {"next rule": "retrieve", "all done": "report"})
+    graph.add_edge("retrieve", "propose")
     graph.add_conditional_edges("propose", after_propose,
                                 {"edits applied": "verify", "retry": "propose", "give up": "give_up"})
     graph.add_conditional_edges("verify", after_verify,
@@ -592,9 +626,9 @@ def recursion_limit(max_attempts: int = MAX_ATTEMPTS, max_rules: int = MAX_RULES
                     max_total_attempts: int = MAX_TOTAL_ATTEMPTS) -> int:
     """LangGraph stops any run after this many steps: a second safety net behind the attempt limits.
 
-    Per rule: pick, up to max_total_attempts x (propose + verify), accept or give_up.
+    Per rule: pick, retrieve, up to max_total_attempts x (propose + verify), accept or give_up.
     """
-    return 4 + max_rules * (2 * max(max_attempts, max_total_attempts) + 2)
+    return 4 + max_rules * (2 * max(max_attempts, max_total_attempts) + 3)
 
 
 def mermaid() -> str:
@@ -653,15 +687,18 @@ async def _run_cli(args) -> int:
 
     async with contextlib.AsyncExitStack() as stack:
         saver = await stack.enter_async_context(saver_cm)
-        if args.tools:                            # Phase 3: scans and tools come from the MCP server
-            from .mcp_client import connect
+        retriever = None
+        if args.tools or args.rag:                # Phase 3: scans and tools come from the MCP server
+            from .mcp_client import MODEL_TOOLS, RAG_TOOLS, connect
             server = await stack.enter_async_context(connect())
-            scanner, tools = server.scanner, server.model_tools()
+            scanner, tools = server.scanner, server.model_tools(RAG_TOOLS if args.rag else MODEL_TOOLS)
+            retriever = server.retriever if args.rag else None
             print(f"MCP server started; the model may call: {', '.join(t.name for t in tools)}")
         else:
             scanner, tools = await stack.enter_async_context(Scanner()), None
         graph = build_graph(checkpointer=saver)
-        context = AgentContext(scanner=scanner, model=model, max_attempts=args.max_attempts, tools=tools)
+        context = AgentContext(scanner=scanner, model=model, max_attempts=args.max_attempts, tools=tools,
+                               retriever=retriever)
         snapshot = await graph.aget_state(config)
         if args.thread and snapshot.next:
             print(f"Resuming thread '{args.thread}' (it stopped before: {', '.join(snapshot.next)})")
@@ -718,6 +755,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--history", action="store_true", help="list the checkpoints LangGraph saved")
     parser.add_argument("--tools", action="store_true",
                         help="run as an MCP client: scan on the MCP server and let the model call its tools")
+    parser.add_argument("--rag", action="store_true",
+                        help="like --tools, plus W3C guidance retrieved for each rule (Phase 4)")
     parser.add_argument("--graph", action="store_true", help="print the graph as a Mermaid diagram and exit")
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):

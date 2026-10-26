@@ -24,7 +24,7 @@ pip install -e ".[dev]"
   On Windows, if activation is blocked, run
   `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 - **`pyproject.toml`.** The single list of dependencies and project metadata.
-  We install packages for *all* phases now (LangGraph, MCP, Chroma), so later
+  We install packages for *all* phases now (LangGraph, MCP, retrieval), so later
   phases only add code.
 - **`-e` (editable install).** Installs our `src/a11y_agent` package by
   reference, so code changes take effect without reinstalling, and
@@ -305,11 +305,12 @@ command that fixes it. A healthy run looks like:
 
 ```
 Python               OK    3.12.x
-Packages             OK    16/16 importable
-Resources            OK    axe-core 4.12.1, benchmark 7 files, WCAG corpus 625 files, axe rules 107 files
+Packages             OK    17/17 importable
+Resources            OK    axe-core 4.12.1, benchmark 7 files, WCAG corpus 625 files, axe rules 107 files, embedding model
 Documents            OK    benchmark 305 + 171 rows, WCAG 581 pages, axe 105 rules
 Browser + scanner    OK    broken example: 12 rules violated (score 44); fixed example: 0
-MCP server           OK    5 tools over stdio: scan_html, scan_url, verify_fix, explain_rule, contrast_fix
+Embeddings           OK    384 dimensions; related text scores higher (0.77 vs 0.69)
+MCP server           OK    6 tools over stdio: scan_html, scan_url, verify_fix, explain_rule, contrast_fix, search_wcag
 Model config         OK    MODEL=groq:openai/gpt-oss-120b; pacing: 25 requests/min, 7,000 tokens/min, 8,000 tokens/request
 Model call           OK    replied "ready" in 0.6 s
 Agent reply          OK    usable JSON edits (schema enforced by the provider): <img src="logo.png" alt="...">

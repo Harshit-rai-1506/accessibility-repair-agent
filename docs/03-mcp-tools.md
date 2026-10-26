@@ -335,7 +335,7 @@ number), then `agent_tools`, then the rest of `accessguru`.
 ## Next: Phase 4
 
 Retrieval over the official WCAG documents: chunk the 581 pages loaded in
-Phase 0, index them (Chroma embeddings plus BM25 keywords, filtered to the
+Phase 0, index them (local embeddings plus BM25 keywords, filtered to the
 violated rule's success criteria), measure retrieval on its own, then serve
 it as an MCP tool (`search_wcag`) so the model can look up the W3C's own
-techniques and failure examples.
+techniques and failure examples. (Built: [docs/04-retrieval.md](04-retrieval.md).)

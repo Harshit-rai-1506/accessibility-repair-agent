@@ -53,6 +53,11 @@ jobs:
       - name: Setup check (no API key in CI)
         run: python scripts/check_setup.py --skip-llm
 
+      # Retrieval quality with the real embedding model (Phase 4), shown as notices on the run page.
+      - name: Retrieval evaluation (Linux)
+        if: runner.os == 'Linux'
+        run: python -m a11y_agent.retrieval eval --annotate
+
       - name: Record resolved package versions
         if: always()
         run: python -m pip freeze --exclude-editable > resolved-requirements.txt

@@ -31,10 +31,12 @@ dependencies = [
     # Loading resources as LangChain Documents (HTML -> Markdown)
     "markdownify>=1.2,<2",
     "beautifulsoup4>=4.12",
-    # Phase 4: retrieval over WCAG documentation
+    # Phase 4: retrieval over WCAG documentation (keywords + local CPU embeddings)
     "langchain-text-splitters>=1.1,<2",
-    "chromadb>=1.5,<2",
     "rank-bm25>=0.2.2",
+    "onnxruntime>=1.18",           # runs the bge-small embedding model on the CPU
+    "tokenizers>=0.20",            # its tokenizer
+    "numpy>=1.26",
     # Shared utilities
     "pydantic>=2.7,<3",
     "python-dotenv>=1.0",
@@ -54,4 +56,5 @@ markers = [
     "data: needs the resources from scripts/fetch_resources.py",
     "llm: calls a real model API (skipped unless a key is set)",
     "slow: takes a minute or more (deselect with -m \"not slow\")",
+    "embedding: needs the downloaded embedding model (scripts/fetch_resources.py)",
 ]

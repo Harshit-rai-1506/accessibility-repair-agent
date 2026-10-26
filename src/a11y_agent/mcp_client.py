@@ -36,7 +36,9 @@ from .scanner import ScanResult, Violation, ViolationNode
 
 SERVER_NAME = "accessibility"
 MODEL_TOOLS = ("explain_rule", "contrast_fix")       # offered to the model; scanning stays with the graph
-PASS_THROUGH_ENV = ("PLAYWRIGHT_BROWSERS_PATH", "PYTHONPATH", "VIRTUAL_ENV", "DATA_DIR", "AXE_VERSION")
+RAG_TOOLS = MODEL_TOOLS + ("search_wcag",)          # Phase 4: the model may also search the WCAG documents
+PASS_THROUGH_ENV = ("PLAYWRIGHT_BROWSERS_PATH", "PYTHONPATH", "VIRTUAL_ENV", "DATA_DIR", "AXE_VERSION",
+                    "A11Y_EMBEDDINGS")
 
 
 class McpToolError(RuntimeError):
@@ -90,6 +92,22 @@ class McpScanner:
         return scan_from_report(result.structuredContent)
 
 
+class McpRetriever:
+    """The agent's ``retrieve`` step, answered by the server's ``search_wcag`` tool."""
+
+    def __init__(self, session: ClientSession):
+        self.session = session
+
+    async def guidance(self, query: str, criteria: list[str] | None, k: int = 3) -> list[dict]:
+        result = await self.session.call_tool("search_wcag", {
+            "query": query, "success_criteria": criteria or [], "k": k,
+            "page_types": ["technique", "failure", "understanding"],     # pages that say how to meet a criterion
+        })
+        if result.isError:
+            raise McpToolError(_tool_text(result))
+        return result.structuredContent["passages"]
+
+
 @dataclass
 class McpServer:
     """An open connection to the server: the raw session, its tools as LangChain tools, and a scanner."""
@@ -99,6 +117,10 @@ class McpServer:
 
     def model_tools(self, names: tuple[str, ...] = MODEL_TOOLS) -> list[BaseTool]:
         return [t for t in self.tools if t.name in names]
+
+    @property
+    def retriever(self) -> McpRetriever:
+        return McpRetriever(self.session)
 
 
 @asynccontextmanager

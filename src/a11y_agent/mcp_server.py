@@ -12,6 +12,7 @@ Tools (functions a client can call; their JSON schemas come from the type hints)
     explain_rule(rule_id)                           what an axe rule requires and how to pass it
     contrast_fix(foreground, background, target_ratio)
                                                     contrast ratio, and the closest colours that pass
+    search_wcag(query, success_criteria, k)         passages from the W3C's WCAG documents (Phase 4)
 
 Resource (read-only data a client can fetch by URI):
     axe-rule://{rule_id}                            same text as explain_rule
@@ -299,6 +300,39 @@ def contrast_fix(
         return ContrastReport(**suggest_colors(foreground, background, target_ratio))
     except ColorError as e:
         raise ValueError(str(e)) from e
+
+
+class Passage(BaseModel):
+    title: str
+    section: str
+    url: str
+    doc_type: str = Field(description="technique, failure, understanding, success_criterion or axe_rule")
+    technique_id: str = Field(description="e.g. H37 or F65; empty for other pages")
+    sc: str = Field(description="success criteria the page belongs to, comma-separated")
+    text: str
+
+
+class SearchResults(BaseModel):
+    passages: list[Passage]
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def search_wcag(
+    query: Annotated[str, Field(description="What to look up, e.g. 'how to give an icon link an accessible name'.")],
+    success_criteria: Annotated[list[str], Field(description="Only these WCAG success criteria, e.g. ['2.4.4']. "
+                                                             "Empty for all.")] = [],  # noqa: B006
+    k: Annotated[int, Field(ge=1, le=10, description="How many passages to return.")] = 3,
+    page_types: Annotated[list[str], Field(description="Only these page types: technique, failure, understanding, "
+                                                       "success_criterion, axe_rule. Empty for all.")] = [],  # noqa: B006
+) -> SearchResults:
+    """Search the W3C's WCAG 2.2 Understanding documents, Techniques and Failures, and axe-core's rule texts.
+
+    Hybrid search (keywords + meaning). Returns the best passages with title, section and link.
+    """
+    from .retrieval import shared_index
+    index = await asyncio.to_thread(shared_index)        # built on first use (embeddings are cached)
+    hits = index.search(query, k, criteria=success_criteria or None, doc_types=tuple(page_types) or None)
+    return SearchResults(passages=[Passage(**h.as_dict()) for h in hits])
 
 
 @mcp.resource("axe-rule://{rule_id}", mime_type="text/plain")
