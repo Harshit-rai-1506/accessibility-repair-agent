@@ -1,0 +1,330 @@
+id,rule_id,category,page_level,status,old_score,new_score,target_fixed,resolved,introduced,dropped_content,text_kept,elements_kept,passes,calls,input_tokens,output_tokens,note,trace
+accessguru-004,color-contrast-enhanced,Layout,False,ok,4,0,True,True,,False,1.0,1.0,1,1,474,99,fixed after 1 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 21; to fix: color-contrast-enhanced
+pick: next rule: color-contrast-enhanced
+propose: 1 edit(s): ""color: #005ea2;"" -> ""color: #003366;""
+verify: passed -> accept
+accept: fixed color-contrast-enhanced in 1 attempt(s)
+pick: nothing left to fix
+report: score 21 -> 17; 1 rule(s) fixed"
+accessguru-010,color-contrast-enhanced,Layout,False,no_improvement,4,4,False,False,,False,1.0,1.0,3,3,11630,1561,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 21; to fix: color-contrast-enhanced
+pick: next rule: color-contrast-enhanced
+propose: edits could not be applied: Edit 3: the find text occurs 2 times ("".c-storiesNeonMeta_authorMeta { color: #020203; background-color: #ff5d53; }""). Include more of the surrounding HTML so it matches only one place. Edit 5: the find text occurs 2 times ("".c-storiesNeonMeta_authorMeta { color: #020203; background-color: #ff5d53; }""). Include more of the surrounding HTML so it matches only one place.
+propose: 5 edit(s): "".c-storiesNeonMeta_byline { color: #e71d1d; background-color: #121218; }"" -> "".c-storiesNeonMeta_byline { color: #5e5e62; background-color: #121218; }""; "".c-storiesNeonMeta_dek.c-storiesNeonMeta_textClampDek { color: #020203; background-color: #ff5d53; }"" -> "".c-storiesNeonMeta_dek.c-storiesNeonMeta_textClampDek { color: #5e5e62; background-color: #ff5d53; }""; ""/* Author metadata */ .c-storiesNeonMeta_authorMeta { color: #020203; background-color: #ff5d53; }"" -> ""/* Author metadata */ .c-storiesNeonMeta_authorMeta { color: #5e5e62; background-color: #ff5d53; }""; ""/* Paid content tag */ .c-storiesPaidTag_text { color: #020203; background-color: #ff5d53; }"" -> ""/* Paid content tag */ .c-storiesPaidTag_text { color: #5e5e62; background-color: #ff5d53; }""; ""/* Another variation for author metadata */ .c-storiesNeonMeta_authorMeta { color: #020203; background-color: #ff5d53; }"" -> ""/* Another variation for author metadata */ .c-storiesNeonMeta_authorMeta { color: #5e5e62; background-color: #ff5d53; }""
+verify: The rule ""color-contrast-enhanced"" still fails: <div class=""c-storiesNeonMeta_byline"">
+      Phones
+    </div> (Fix any of the following: Element has insufficient color contrast of 6.03 (foreground color: #ffffff, background color: #7a2af5, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 7:1); <p class=""c-storiesNeonMeta_dek c-storiesNeonMeta_textClampDek"">
+      Samsung's next Galaxy S25 model is set to arrive later in 2025.
+    </p> (Fix any of the following: Element has insufficient color contrast of 6.45 (foreground color: #ffffff, background color: #5e5e62, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 7:1); <div class=""c-storiesNeonLinkStack_dek g-text-xxsmall"">Our experts share the newest products and technologies that get you the most of your world.</div> (Fix any of the following: Element has insufficient color contrast of 6.45 (foreground color: #5e5e62, background color: #ffffff, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 7:1); and 16 more. Your change made another rule fail, ""color-contrast"": <span class=""c-storiesNeonMeta_authorMeta"">
+        Mike Sorrentino
+      </span> (Fix any of the following: Element has insufficient color contrast of 2.13 (foreground color: #5e5e62, background color: #ff5d53, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 4.5:1); <span class="
+accessguru-017,color-contrast-enhanced,Layout,False,ok,4,0,True,True,,False,1.0,1.0,2,2,1676,320,fixed after 2 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 21; to fix: color-contrast-enhanced
+pick: next rule: color-contrast-enhanced
+propose: edits could not be applied: Edit 1: the find text occurs 2 times (""color: #5f6368;""). Include more of the surrounding HTML so it matches only one place.
+propose: 2 edit(s): "".fc-vendors-list-dialog { color: #5f6368; background-color: #ffffff; }"" -> "".fc-vendors-list-dialog { color: #121212; background-color: #ffffff; }""; "".fc-button-label { color: #5f6368; background-color: #ffffff; }"" -> "".fc-button-label { color: #121212; background-color: #ffffff; }""
+verify: passed -> accept
+accept: fixed color-contrast-enhanced in 2 attempt(s)
+pick: nothing left to fix
+report: score 21 -> 17; 1 rule(s) fixed"
+accessguru-021,color-contrast-enhanced,Layout,False,ok,4,0,True,True,,False,1.0,1.0,3,3,7989,1101,fixed after 3 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 21; to fix: color-contrast-enhanced
+pick: next rule: color-contrast-enhanced
+propose: 1 edit(s): "".nav-item.home, .nav-item.news, .nav-item.north, .nav-item.sports, .nav-item.opinion, .nav-item.things-to-do, .nav-item…"" -> "".nav-item.home, .nav-item.news, .nav-item.north, .nav-item.sports, .nav-item.opinion, .nav-item.things-to-do, .nav-item…""
+verify: The rule ""color-contrast-enhanced"" still fails: <span class=""p1-label"">Elections</span> (Fix any of the following: Element has insufficient color contrast of 5.74 (foreground color: #666666, background color: #ffffff, font size: 12.0pt (16px), font weight: bold). Expected contrast ratio of 7:1); <span class=""p1-label"">IU</span> (Fix any of the following: Element has insufficient color contrast of 5.74 (foreground color: #666666, background color: #ffffff, font size: 12.0pt (16px), font weight: bold). Expected contrast ratio of 7:1); <span class=""p1-label"">Pacers</span> (Fix any of the following: Element has insufficient color contrast of 5.74 (foreground color: #666666, background color: #ffffff, font size: 12.0pt (16px), font weight: bold). Expected contrast ratio of 7:1); and 12 more. -> retry
+propose: 2 edit(s): "".nav-item { color: #626262; background-color: #ffffff;"" -> "".nav-item { color: #000000; background-color: #ffffff;""; "".nav-item.home, .nav-item.news, .nav-item.north, .nav-item.sports, .nav-item.opinion, .nav-item.things-to-do, .nav-item…"" -> "".nav-item.home, .nav-item.news, .nav-item.north, .nav-item.sports, .nav-item.opinion, .nav-item.things-to-do, .nav-item…""
+verify: The rule ""color-contrast-enhanced"" still fails: <span class=""p1-label"">Elections</span> (Fix any of the following: Element has insufficient color contrast of 5.74 (foreground color: #666666, background color: #ffffff, font size: 12.0pt (16px), font weight: bold). Expected contrast ratio of 7:1); <span class=""p1-label"">IU</span> (Fix any of the following: Element has insufficient color contrast of 5.74 (foreground color: #666666, background color: #ffffff, font size: 12.0pt (16px), font weight: bold). Expected contrast ratio of 7:1); <span class=""p1-label"">Pacers</span> (Fix any of the following: Element has insufficient color contrast of 5.74 (foreground color: #666666, background color: #ffffff, font size: 12.0pt (16px), font weight: bold). Expected contrast ratio of 7:1); and 12 more. -> retry
+propose: 3 edit(s): "".nav-item { color: #626262; background-color: #ffffff;"" -> "".nav-item { color: #000000; background-color: #ffffff;""; "".nav-item.home, .nav-item.news, .nav-item.north, .nav-item.sports, .nav-item.opinion, .nav-item.things-to-do, .nav-item…"" -> "".nav-item.home, .nav-item.news, .nav-item.north, .nav-item.sports, .nav-item.opinion, .nav-item.things-to-do, .nav-item…""; "".p1-label { color: #666666; background-color: #ffffff;"" -> "".p1-label { color: #000000; background-color: #ffffff;""
+verify: passed -> accept
+accept: fixed color-contrast-enhanced in 3 attemp"
+accessguru-024,color-contrast-enhanced,Layout,False,ok,4,0,True,True,,False,1.0,1.0,1,1,3704,149,fixed after 1 attempt(s),"scan: reused the caller's scan: 7 rule(s) violated, score 25; to fix: color-contrast-enhanced
+pick: next rule: color-contrast-enhanced
+propose: 1 edit(s): "".text.font--serif.svelte-1qpwxqa { color: #ffffff; background-color: #da352b; }"" -> "".text.font--serif.svelte-1qpwxqa { color: #f0f0f0; background-color: #da352b; }""
+verify: passed -> accept
+accept: fixed color-contrast-enhanced in 1 attempt(s)
+pick: nothing left to fix
+report: score 25 -> 21; 1 rule(s) fixed"
+accessguru-032,color-contrast-enhanced,Layout,False,ok,4,0,True,True,,False,1.0,1.0,1,1,1022,170,fixed after 1 attempt(s),"scan: reused the caller's scan: 7 rule(s) violated, score 25; to fix: color-contrast-enhanced
+pick: next rule: color-contrast-enhanced
+propose: 1 edit(s): "".u-subhead.u-margin-bottom-small\@sm { color: #828da8; background-color: #f6f6f6; }"" -> "".u-subhead.u-margin-bottom-small\@sm { color: #2bc5b4; background-color: #f6f6f6; }""
+verify: passed -> accept
+accept: fixed color-contrast-enhanced in 1 attempt(s)
+pick: nothing left to fix
+report: score 25 -> 21; 1 rule(s) fixed"
+accessguru-035,color-contrast-enhanced,Layout,False,no_improvement,4,4,False,False,,False,1.0,1.0,3,3,14816,1134,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 9 rule(s) violated, score 31; to fix: color-contrast-enhanced
+pick: next rule: color-contrast-enhanced
+propose: 1 edit(s): "".bg-category-south-africa { color: #ffffff; background-color: #fd0a10; }"" -> "".bg-category-south-africa { color: #ffffff; background-color: #8b0000; }""
+verify: The rule ""color-contrast-enhanced"" still fails: <a href=""https://www.citizen.co.za/news/south-africa/"" class=""bg-category-south-africa"">
+                                        South Africa                                </a> (Fix any of the following: Element has insufficient color contrast of 4.73 (foreground color: #cc0a17, background color: #e8e8e8, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 7:1); <a href=""https://www.citizen.co.za/news/south-africa/politics/"" class=""bg-category-politics"">
+                                        Politics                                </a> (Fix any of the following: Element has insufficient color contrast of 5.79 (foreground color: #ffffff, background color: #cc0a17, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 7:1); <a href=""https://www.citizen.co.za/news/south-africa/"" class=""text-category-south-africa"">
+                                        South Africa                                </a> (Fix any of the following: Element has insufficient color contrast of 5.79 (foreground color: #ffffff, background color: #cc0a17, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 7:1); and 26 more. -> retry
+propose: 5 edit(s): "".bg-category-south-africa { color: #ffffff; background-color: #fd0a10; }"" -> "".bg-category-south-africa { color: #ffffff; background-color: #800020; }""; "".bg-category-politics { color: #ffffff; background-color: #cc0a17; }"" -> "".bg-category-politics { color: #ffffff; background-color: #660000; }""; "".text-category-south-africa { color: #ffffff; background-color: #cc0a17; }"" -> "".text-category-south-africa { color: #ffffff; background-color: #660000; }""; "".text-category-motoring { color: #ffffff; background-color: #cc0a17; }"" -> "".text-category-motoring { color: #ffffff; background-color: #660000; }""; "".bg-category-south-africa, .bg-category-local-soccer, .bg-category-rugby, .bg-category-weather { color: #cc0a17; backgr…"" -> "".bg-category-south-africa, .bg-category-local-soccer, .bg-category-rugby, .bg-category-weather { color: #cc0a17; backgr…""
+verify: The rule ""color-contrast-enhanced"" still fails: <a href=""https://www.citizen.co.za/sport/cricket/"" class=""bg-category-cricket"">
+                                        Cricket                                </a> (Fix any of the following: Element has insufficient color contrast of 5.79 (foreground color: #ffffff, background color: #cc0a17, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 7:1); <a href=""https://www.citizen.co.za/lotto/"" class=""bg-category-lotto"">
+                                        Lotto                     "
+accessguru-037,color-contrast-enhanced,Layout,False,ok,4,0,True,True,,False,1.0,1.0,1,1,1089,108,fixed after 1 attempt(s),"scan: reused the caller's scan: 8 rule(s) violated, score 29; to fix: color-contrast-enhanced
+pick: next rule: color-contrast-enhanced
+propose: 1 edit(s): ""background-color: #4b4b4b;"" -> ""background-color: #2a2a2a;""
+verify: passed -> accept
+accept: fixed color-contrast-enhanced in 1 attempt(s)
+pick: nothing left to fix
+report: score 29 -> 25; 1 rule(s) fixed"
+accessguru-039,region,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,3,4611,624,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 8 rule(s) violated, score 30; to fix: region
+pick: next rule: region
+propose: 2 edit(s): ""<div class=""DesignSystem""> <a class=""u-showOnFocus"" href=""#site""> Skip to main content </a> </div>"" -> ""<div class=""DesignSystem"" role=""main""> <a class=""u-showOnFocus"" href=""#site""> Skip to main content </a> </div>""; ""<div class=""DesignSystem"" id=""credit"" style=""width:100%;"">"" -> ""<div class=""DesignSystem"" id=""credit"" style=""width:100%;"" role=""contentinfo"">""
+verify: The rule ""region"" still fails: <div class=""DesignSystem""> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 2 edit(s): ""<div class=""DesignSystem""> <a class=""u-showOnFocus"" href=""#site""> Skip to main content </a> </div>"" -> ""<div class=""DesignSystem"" role=""main""> <a class=""u-showOnFocus"" href=""#site""> Skip to main content </a> </div>""; ""<div class=""DesignSystem"" id=""credit"" style=""width:100%;"">"" -> ""<div class=""DesignSystem"" id=""credit"" style=""width:100%;"" role=""contentinfo"">""
+verify: The rule ""region"" still fails: <div class=""DesignSystem""> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 2 edit(s): ""<div class=""DesignSystem""> <a class=""u-showOnFocus"" href=""#site""> Skip to main content </a> </div>"" -> ""<div class=""DesignSystem"" role=""main""> <a class=""u-showOnFocus"" href=""#site""> Skip to main content </a> </div>""; ""<div class=""DesignSystem"" id=""credit"" style=""width:100%;"">"" -> ""<div class=""DesignSystem"" id=""credit"" style=""width:100%;"" role=""contentinfo"">""
+verify: The rule ""region"" still fails: <div class=""DesignSystem""> (Fix any of the following: Some page content is not contained by landmarks). -> give_up
+give_up: left region unfixed (not_fixed)
+pick: nothing left to fix
+report: score 30 -> 30; 0 rule(s) fixed"
+accessguru-040,region,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,1,1,419,188,fixed after 1 attempt(s),"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: region
+pick: next rule: region
+propose: 1 edit(s): ""<div class=""loading-content""> <img class=""kanopy-logo"" src=""/kui-assets/kanopy-logo.svg"" alt=""kanopy logo""> <img class=…"" -> ""<div class=""loading-content"" role=""region"" aria-label=""Loading content""> <img class=""kanopy-logo"" src=""/kui-assets/kano…""
+verify: passed -> accept
+accept: fixed region in 1 attempt(s)
+pick: nothing left to fix
+report: score 17 -> 14; 1 rule(s) fixed"
+accessguru-046,region,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,2,2,1211,569,fixed after 2 attempt(s),"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: region
+pick: next rule: region
+propose: 2 edit(s): ""<div class=""l-static_page m-wide"">, <div class=""l-static_page m-wide m-hide-sm m-hide-md_down block-bg"">, <div class=""l…"" -> ""<main> <div class=""l-static_page m-wide"">, <div class=""l-static_page m-wide m-hide-sm m-hide-md_down block-bg"">, <div c…""; ""<div class=""b-footer_sticky footer-promo-colour"" id=""footer-sticky-promo""> <a href=""https://www.boohoo.com/womens/premi…"" -> ""<aside class=""b-footer_sticky footer-promo-colour"" id=""footer-sticky-promo""> <a href=""https://www.boohoo.com/womens/pre…""
+verify: Your change removed content (kept 100% of the words and 88% of the elements). Keep all existing text and elements. -> retry
+propose: 1 edit(s): ""<div class=""l-static_page m-wide"">, <div class=""l-static_page m-wide m-hide-sm m-hide-md_down block-bg"">, <div class=""l…"" -> ""<main><div class=""l-static_page m-wide"">, <div class=""l-static_page m-wide m-hide-sm m-hide-md_down block-bg"">, <div cl…""
+verify: passed -> accept
+accept: fixed region in 2 attempt(s)
+pick: nothing left to fix
+report: score 17 -> 11; 1 rule(s) fixed"
+accessguru-056,region,Syntax,True,ok,3,0,True,True,,False,0.963,1.0,1,1,482,238,fixed after 1 attempt(s),"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: region
+pick: next rule: region
+propose: 1 edit(s): ""<div aria-atomic=""true"" aria-live=""off"" class=""cgtzj"" id=""page_announcer"" tabindex=""-1"">Australian Breaking News Headli…"" -> ""<div role=""contentinfo"" aria-atomic=""true"" aria-live=""off"" class=""cgtzj"" id=""page_announcer"" tabindex=""-1"">Australian B…""
+verify: passed -> accept
+accept: fixed region in 1 attempt(s)
+pick: nothing left to fix
+report: score 17 -> 11; 1 rule(s) fixed"
+accessguru-059,region,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,2,2,871,209,fixed after 2 attempt(s),"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: region
+pick: next rule: region
+propose: 1 edit(s): ""<canvas id=""drag-image"" height=""30"" width=""30""></canvas>"" -> ""<canvas id=""drag-image"" height=""30"" width=""30"" role=""img""></canvas>""
+verify: The rule ""region"" still fails: <canvas id=""drag-image"" height=""30"" width=""30"" role=""img""></canvas> (Fix any of the following: Some page content is not contained by landmarks). Your change made another rule fail, ""role-img-alt"": <canvas id=""drag-image"" height=""30"" width=""30"" role=""img""></canvas> (Fix any of the following: aria-label attribute does not exist or is empty aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty Element has no title attribute). -> retry
+propose: 1 edit(s): ""<canvas id=""drag-image"" height=""30"" width=""30""></canvas>"" -> ""<div role=""region"" aria-label=""Drag image""><canvas id=""drag-image"" height=""30"" width=""30""></canvas></div>""
+verify: passed -> accept
+accept: fixed region in 2 attempt(s)
+pick: nothing left to fix
+report: score 17 -> 14; 1 rule(s) fixed"
+accessguru-060,region,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,1,1,409,165,fixed after 1 attempt(s),"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: region
+pick: next rule: region
+propose: 1 edit(s): ""<div class=""d-flex justify-content-center justify-content-sm-start""><span id=""session-counter"">27,949,318 sessions and …"" -> ""<main><div class=""d-flex justify-content-center justify-content-sm-start""><span id=""session-counter"">27,949,318 session…""
+verify: passed -> accept
+accept: fixed region in 1 attempt(s)
+pick: nothing left to fix
+report: score 17 -> 11; 1 rule(s) fixed"
+accessguru-064,color-contrast,Layout,False,no_improvement,4,4,False,False,,False,1.0,1.0,3,3,2592,335,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 7 rule(s) violated, score 25; to fix: color-contrast
+pick: next rule: color-contrast
+propose: 1 edit(s): ""color: #947d00;"" -> ""color: #6b5a00;""
+verify: Your change made another rule fail, ""color-contrast-enhanced"": <a href=""/world/report-new-york-bound-united-airlines-flight-catches-fire-during-take-off-passenger-screams-please-get-us-out-of-here-houston-watch-video-3130345"" class=""dnasp-rdmore"">READ MORE</a> (Fix any of the following: Element has insufficient color contrast of 5.09 (foreground color: #6b5a00, background color: #ffde2f, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 7:1). -> retry
+propose: 1 edit(s): ""color: #947d00;"" -> ""color: #5a4a00;""
+verify: Your change made another rule fail, ""color-contrast-enhanced"": <a href=""/world/report-new-york-bound-united-airlines-flight-catches-fire-during-take-off-passenger-screams-please-get-us-out-of-here-houston-watch-video-3130345"" class=""dnasp-rdmore"">READ MORE</a> (Fix any of the following: Element has insufficient color contrast of 6.52 (foreground color: #5a4a00, background color: #ffde2f, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 7:1). -> retry
+propose: 1 edit(s): ""color: #947d00;"" -> ""color: #7a6600;""
+verify: The rule ""color-contrast"" still fails: <a href=""/world/report-new-york-bound-united-airlines-flight-catches-fire-during-take-off-passenger-screams-please-get-us-out-of-here-houston-watch-video-3130345"" class=""dnasp-rdmore"">READ MORE</a> (Fix any of the following: Element has insufficient color contrast of 4.22 (foreground color: #7a6600, background color: #ffde2f, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 4.5:1). -> give_up
+give_up: left color-contrast unfixed (not_fixed)
+pick: nothing left to fix
+report: score 25 -> 25; 0 rule(s) fixed"
+accessguru-069,color-contrast,Layout,False,no_improvement,4,4,False,False,,False,1.0,1.0,3,3,5633,1500,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 21; to fix: color-contrast
+pick: next rule: color-contrast
+propose: edits could not be applied: Edit 1: the find text occurs 2 times (""color: #f6f9f8; background-color: #3db5cc;""). Include more of the surrounding HTML so it matches only one place. Edit 2: the find text occurs 2 times (""color: #f6f9f8; background-color: #3db5cc;""). Include more of the surrounding HTML so it matches only one place. Edit 3: the find text occurs 5 times (""color: #ffffff; background-color: #3db5cc;""). Include more of the surrounding HTML so it matches only one place. Edit 4: the find text occurs 5 times (""color: #ffffff; background-color: #3db5cc;""). Include more of the surrounding HTML so it matches only one place. Edit 5: the find text occurs 5 times (""color: #ffffff; background-color: #3db5cc;""). Include more of the surrounding HTML so it matches only one place. Edit 6: the find text occurs 5 times (""color: #ffffff; background-color: #3db5cc;""). Include more of the surrounding HTML so it matches only one place.
+propose: edits could not be applied: Edit 3: the find text occurs 2 times ("".story__tag { color: #ffffff; background-color: #3db5cc; } .story__tag {""). Include more of the surrounding HTML so it matches only one place. Edit 5: the find text occurs 3 times ("".story__tag { color: #ffffff; background-color: #3db5cc; }""). Include more of the surrounding HTML so it matches only one place.
+propose: edits could not be applied: Edit 3: the find text occurs 2 times ("".story__tag { color: #ffffff; background-color: #3db5cc; } .story__tag {""). Include more of the surrounding HTML so it matches only one place. Edit 5: the find text occurs 3 times ("".story__tag { color: #ffffff; background-color: #3db5cc; }""). Include more of the surrounding HTML so it matches only one place.
+give_up: left color-contrast unfixed (not_fixed)
+pick: nothing left to fix
+report: score 21 -> 21; 0 rule(s) fixed"
+accessguru-071,color-contrast,Layout,False,ok,4,0,True,True,,False,1.0,1.0,1,1,2278,135,fixed after 1 attempt(s),"scan: reused the caller's scan: 7 rule(s) violated, score 25; to fix: color-contrast
+pick: next rule: color-contrast
+propose: 1 edit(s): "".navigation-footer__link { color: #627da2; background-color: #1d3461; }"" -> "".navigation-footer__link { color: #ffffff; background-color: #1d3461; }""
+verify: passed -> accept
+accept: fixed color-contrast in 1 attempt(s)
+pick: nothing left to fix
+report: score 25 -> 21; 1 rule(s) fixed"
+accessguru-098,link-name,Syntax,False,ok,4,0,True,True,,False,1.0,1.0,1,1,1029,180,fixed after 1 attempt(s),"scan: reused the caller's scan: 7 rule(s) violated, score 25; to fix: link-name
+pick: next rule: link-name
+propose: 1 edit(s): ""<a href=""/real-estate/1701-market-office-conversion-super-bowl-ticket-mortgage-20250206.html"" data-link-type=""standard-…"" -> ""<a href=""/real-estate/1701-market-office-conversion-super-bowl-ticket-mortgage-20250206.html"" data-link-type=""standard-…""
+verify: passed -> accept
+accept: fixed link-name in 1 attempt(s)
+pick: nothing left to fix
+report: score 25 -> 21; 1 rule(s) fixed"
+accessguru-100,link-name,Syntax,False,ok,4,3,True,False,region,False,1.0,1.0,3,3,4566,1086,improved after 3 attempt(s),"scan: reused the caller's scan: 5 rule(s) violated, score 18; to fix: link-name
+pick: next rule: link-name
+propose: 5 edit(s): ""<a class=""m-social i-youtube"" href=""//youtube.com/c/codechef1""></a>"" -> ""<a class=""m-social i-youtube"" href=""//youtube.com/c/codechef1"" aria-label=""YouTube""></a>""; ""<a class=""m-social i-facebook"" href=""//facebook.com/CodeChef""></a>"" -> ""<a class=""m-social i-facebook"" href=""//facebook.com/CodeChef"" aria-label=""Facebook""></a>""; ""<a class=""m-social i-instagram"" href=""//instagram.com/codechef""></a>"" -> ""<a class=""m-social i-instagram"" href=""//instagram.com/codechef"" aria-label=""Instagram""></a>""; ""<a class=""m-social i-twitter"" href=""//twitter.com/codechef""></a>"" -> ""<a class=""m-social i-twitter"" href=""//twitter.com/codechef"" aria-label=""Twitter""></a>""; ""<a class=""m-social i-medium"" href=""//medium.com/codechef-official""></a>"" -> ""<a class=""m-social i-medium"" href=""//medium.com/codechef-official"" aria-label=""Medium""></a>""
+verify: The rule ""link-name"" still fails: <a class=""m-social i-quora"" href=""//quora.com/topic/CodeChef""></a> (Fix all of the following: Element is in tab order and does not have accessible text Fix any of the following: Element does not have text that is visible to screen readers aria-label attribute does not exist or is empty aria-labelledby attribute does not exist, references elements that do not exist o); <a class=""m-social i-linkedin"" href=""//linkedin.com/company/codechef""></a> (Fix all of the following: Element is in tab order and does not have accessible text Fix any of the following: Element does not have text that is visible to screen readers aria-label attribute does not exist or is empty aria-labelledby attribute does not exist, references elements that do not exist o). Your change made another rule fail, ""region"": <a class=""m-social i-youtube"" href=""//youtube.com/c/codechef1"" aria-label=""YouTube""></a> (Fix any of the following: Some page content is not contained by landmarks); <a class=""m-social i-facebook"" href=""//facebook.com/CodeChef"" aria-label=""Facebook""></a> (Fix any of the following: Some page content is not contained by landmarks); <a class=""m-social i-instagram"" href=""//instagram.com/codechef"" aria-label=""Instagram""></a> (Fix any of the following: Some page content is not contained by landmarks); and 2 more. -> retry
+propose: 5 edit(s): ""<a class=""m-social i-youtube"" href=""//youtube.com/c/codechef1""></a>"" -> ""<a class=""m-social i-youtube"" href=""//youtube.com/c/codechef1"">YouTube</a>""; ""<a class=""m-social i-facebook"" href=""//facebook.com/CodeChef""></a>"" -> ""<a class=""m-social i-facebook"" href=""//facebook.com/CodeChef"">Facebook</a>""; ""<a class=""m-social i-instagram"" href=""//instagram.com/codechef""></a>"" -> ""<a class=""m-social i-instagram"" href=""//instagram.com/codechef"">Instagram</a>""; ""<a class=""m-social i-twitter"" href=""//twitter.com/codechef""></a>"" -> ""<a class=""m-social i-twitter"" href=""//twitter.com/codechef"">Twitter</a>""; ""<a class=""m-social i-medium"" href=""//medium.com/codechef-offici"
+accessguru-105,link-name,Syntax,False,ok,4,0,True,True,,False,1.0,1.0,1,1,551,108,fixed after 1 attempt(s),"scan: reused the caller's scan: 7 rule(s) violated, score 25; to fix: link-name
+pick: next rule: link-name
+propose: 1 edit(s): ""<a id=""Pinterest"" href=""https://www.pinterest.com/usatoday/"" on-tap=""trackClick(this)"">"" -> ""<a id=""Pinterest"" href=""https://www.pinterest.com/usatoday/"" on-tap=""trackClick(this)"" aria-label=""Pinterest"">""
+verify: passed -> accept
+accept: fixed link-name in 1 attempt(s)
+pick: nothing left to fix
+report: score 25 -> 21; 1 rule(s) fixed"
+accessguru-112,link-name,Syntax,False,ok,4,0,True,True,,False,1.0,1.0,1,1,592,147,fixed after 1 attempt(s),"scan: reused the caller's scan: 7 rule(s) violated, score 25; to fix: link-name
+pick: next rule: link-name
+propose: 1 edit(s): ""<a href=""https://play.google.com/store/apps/details?id=com.saltlaketribune.android.prod&amp;hl=en_US&amp;gl=US"" class=""…"" -> ""<a href=""https://play.google.com/store/apps/details?id=com.saltlaketribune.android.prod&amp;hl=en_US&amp;gl=US"" class=""…""
+verify: passed -> accept
+accept: fixed link-name in 1 attempt(s)
+pick: nothing left to fix
+report: score 25 -> 21; 1 rule(s) fixed"
+accessguru-119,landmark-one-main,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,1,1,413,101,fixed after 1 attempt(s),"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
+pick: next rule: landmark-one-main
+propose: 2 edit(s): ""<body> <details>"" -> ""<body> <main> <details>""; ""</details> </body>"" -> ""</details> </main> </body>""
+verify: passed -> accept
+accept: fixed landmark-one-main in 1 attempt(s)
+pick: nothing left to fix
+report: score 10 -> 7; 1 rule(s) fixed"
+accessguru-121,landmark-one-main,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,3,1851,649,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
+pick: next rule: landmark-one-main
+propose: edits could not be applied: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown.
+propose: edits could not be applied: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown.
+propose: edits could not be applied: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown.
+give_up: left landmark-one-main unfixed (not_fixed)
+pick: nothing left to fix
+report: score 10 -> 10; 0 rule(s) fixed"
+accessguru-122,landmark-one-main,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,3,1569,769,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
+pick: next rule: landmark-one-main
+propose: edits could not be applied: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown.
+propose: edits could not be applied: Edit 2: the find text was not found (it begins ""</body>""). Copy it exactly from the HTML shown.
+propose: edits could not be applied: Edit 2: the find text was not found (it begins ""<body>""). Copy it exactly from the HTML shown. Edit 3: the find text was not found (it begins ""</body>""). Copy it exactly from the HTML shown.
+give_up: left landmark-one-main unfixed (not_fixed)
+pick: nothing left to fix
+report: score 10 -> 10; 0 rule(s) fixed"
+accessguru-131,landmark-one-main,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,3,1425,503,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
+pick: next rule: landmark-one-main
+propose: edits could not be applied: Edit 2: the find text was not found (it begins ""</body>""). Copy it exactly from the HTML shown.
+propose: edits could not be applied: Edit 2: the find text was not found (it begins ""</body>""). Copy it exactly from the HTML shown.
+propose: edits could not be applied: Edit 2: the find text was not found (it begins ""</body>""). Copy it exactly from the HTML shown.
+give_up: left landmark-one-main unfixed (not_fixed)
+pick: nothing left to fix
+report: score 10 -> 10; 0 rule(s) fixed"
+accessguru-135,page-has-heading-one,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,3,1593,556,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: page-has-heading-one
+pick: next rule: page-has-heading-one
+propose: 1 edit(s): ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated"">"" -> ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated""> <head> <title>Page T…""
+verify: Your change made another rule fail, ""region"": <h1>Page Title</h1> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated"">"" -> ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated""> <head> <title>Page T…""
+verify: The rule ""page-has-heading-one"" still fails: <html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated""> (Fix all of the following: Page must have a level-one heading). -> retry
+propose: 1 edit(s): ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated"">"" -> ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated""> <head> <title>Page T…""
+verify: Your change made another rule fail, ""region"": <h1 style=""position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;"">Page Title</h1> (Fix any of the following: Some page content is not contained by landmarks). -> give_up
+give_up: left page-has-heading-one unfixed (not_fixed)
+pick: nothing left to fix
+report: score 10 -> 10; 0 rule(s) fixed"
+accessguru-140,page-has-heading-one,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,3,3,1272,305,fixed after 3 attempt(s),"scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: page-has-heading-one
+pick: next rule: page-has-heading-one
+propose: 1 edit(s): ""<html>"" -> ""<html> <head> <title>Document</title> </head> <body> <h1>Page Title</h1> </body> </html>""
+verify: Your change made another rule fail, ""region"": <h1>Page Title</h1> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<html>"" -> ""<html> <head> <title>Document</title> </head> <body> <h1 style=""position: absolute; left: -9999px; top: -9999px;"">Page …""
+verify: Your change made another rule fail, ""region"": <h1 style=""position: absolute; left: -9999px; top: -9999px;"">Page Title</h1> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<html>"" -> ""<html> <head> <title>Document</title> </head> <body> <main> <h1>Page Title</h1>""
+verify: passed -> accept
+accept: fixed page-has-heading-one in 3 attempt(s)
+pick: nothing left to fix
+report: score 14 -> 4; 1 rule(s) fixed"
+accessguru-141,page-has-heading-one,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,3,1440,648,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: page-has-heading-one
+pick: next rule: page-has-heading-one
+propose: 1 edit(s): ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE"">"" -> ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE""> <head> <style> .visually-hidden { position: absolute; width…""
+verify: Your change made another rule fail, ""region"": <h1 class=""visually-hidden"">Hauptinhalt</h1> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE"">"" -> ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE""> <head> <style>.visually-hidden { position: absolute; width:…""
+verify: Your change made another rule fail, ""region"": <h1 class=""visually-hidden"">Hauptinhalt</h1> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE"">"" -> ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE""> <head> <style> .visually-hidden { position: absolute; width…""
+verify: Your change made another rule fail, ""region"": <h1 class=""visually-hidden"">Hauptinhalt</h1> (Fix any of the following: Some page content is not contained by landmarks). -> give_up
+give_up: left page-has-heading-one unfixed (not_fixed)
+pick: nothing left to fix
+report: score 14 -> 14; 0 rule(s) fixed"
+accessguru-142,page-has-heading-one,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,3,1680,769,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: page-has-heading-one
+pick: next rule: page-has-heading-one
+propose: 1 edit(s): ""<html lang=""en"" dir=""ltr"" prefix=""og: https://ogp.me/ns#"" class=""js fontawesome-i2svg-active fontawesome-i2svg-complete…"" -> ""<html lang=""en"" dir=""ltr"" prefix=""og: https://ogp.me/ns#"" class=""js fontawesome-i2svg-active fontawesome-i2svg-complete…""
+verify: Your change made another rule fail, ""region"": <h1 class=""visually-hidden"">Page content</h1> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<html lang=""en"" dir=""ltr"" prefix=""og: https://ogp.me/ns#"" class=""js fontawesome-i2svg-active fontawesome-i2svg-complete…"" -> ""<html lang=""en"" dir=""ltr"" prefix=""og: https://ogp.me/ns#"" class=""js fontawesome-i2svg-active fontawesome-i2svg-complete…""
+verify: Your change made another rule fail, ""region"": <h1 class=""visually-hidden"">Page content</h1> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<html lang=""en"" dir=""ltr"" prefix=""og: https://ogp.me/ns#"" class=""js fontawesome-i2svg-active fontawesome-i2svg-complete…"" -> ""<html lang=""en"" dir=""ltr"" prefix=""og: https://ogp.me/ns#"" class=""js fontawesome-i2svg-active fontawesome-i2svg-complete…""
+verify: Your change made another rule fail, ""region"": <h1 class=""visually-hidden"">Page content</h1> (Fix any of the following: Some page content is not contained by landmarks). -> give_up
+give_up: left page-has-heading-one unfixed (not_fixed)
+pick: nothing left to fix
+report: score 10 -> 10; 0 rule(s) fixed"
+accessguru-165,image-alt,Syntax,False,no_improvement,5,5,False,False,,False,1.0,1.0,3,3,33987,3647,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 22; to fix: image-alt
+pick: next rule: image-alt
+propose: edits could not be applied: Edit 1: the find text occurs 2 times (""<img src=""https://www.gannett-cdn.com/authoring/authoring-images/2025/02/06/USA…""). Include more of the surrounding HTML so it matches only one place. Edit 4: the find text occurs 2 times (""<img src=""https://www.gannett-cdn.com/authoring/authoring-images/2025/02/05/USA…""). Include more of the surrounding HTML so it matches only one place.
+propose: edits could not be applied: Edit 1: the find text occurs 2 times (""<img src=""https://www.gannett-cdn.com/authoring/authoring-images/2025/02/06/USA…""). Include more of the surrounding HTML so it matches only one place. Edit 4: the find text occurs 2 times (""<img src=""https://www.gannett-cdn.com/authoring/authoring-images/2025/02/05/USA…""). Include more of the surrounding HTML so it matches only one place.
+propose: edits could not be applied: Edit 1: the find text occurs 2 times (""<img src=""https://www.gannett-cdn.com/authoring/authoring-images/2025/02/06/USA…""). Include more of the surrounding HTML so it matches only one place. Edit 4: the find text occurs 2 times (""<img src=""https://www.gannett-cdn.com/authoring/authoring-images/2025/02/05/USA…""). Include more of the surrounding HTML so it matches only one place.
+give_up: left image-alt unfixed (not_fixed)
+pick: nothing left to fix
+report: score 22 -> 22; 0 rule(s) fixed"
+accessguru-170,image-alt,Syntax,False,no_improvement,5,5,False,False,,False,1.0,1.0,3,3,10821,5058,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 22; to fix: image-alt
+pick: next rule: image-alt
+propose: edits could not be applied: Edit 1: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none;"" aria-describedby=""acscarousel_sl…""). Include more of the surrounding HTML so it matches only one place. Edit 2: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none;"" aria-describedby=""acscarousel_sl…""). Include more of the surrounding HTML so it matches only one place. Edit 3: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none;"" aria-describedby=""acscarousel_sl…""). Include more of the surrounding HTML so it matches only one place. Edit 4: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none; opacity: 1;"" aria-describedby=""ac…""). Include more of the surrounding HTML so it matches only one place. Edit 5: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none; opacity: 1;"" aria-describedby=""ac…""). Include more of the surrounding HTML so it matches only one place. Edit 6: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none; opacity: 1;"" aria-describedby=""ac…""). Include more of the surrounding HTML so it matches only one place. Edit 7: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none;"" aria-describedby=""acscarousel_sl…""). Include more of the surrounding HTML so it matches only one place. Edit 8: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none;"" aria-describedby=""acscarousel_sl…""). Include more of the surrounding HTML so it matches only one place. Edit 9: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none;"" aria-describedby=""acscarousel_sl…""). Include more of the surrounding HTML so it matches only one place. Edit 10: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none; opacity: 1;"" aria-describedby=""ac…""). Include more of the surrounding HTML so it matches only one place. Edit 11: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none; opacity: 1;"" aria-describedby=""ac…""). Include more of the surrounding HTML so it matches only one place. Edit 12: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none; opacity: 1;"" aria-describedby=""ac…""). Include more of the surrounding HTML so it matches only one place.
+propose: edits could not be applied: Edit 1: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none;"" aria-describedby=""acscarousel_sl…""). Include more of the surrounding HTML so it matches only one place. Edit 2: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none;"" aria-describedby=""acscarousel_sl…""). Include more of the surrounding HTML so it matches only one place. Edit 3: the find text occurs 2 times (""<img class=""owl-lazy"" style=""max-width: none;"" aria-describedby=""acscarousel_sl…""). Include more of the surrounding H"
+accessguru-175,image-alt,Syntax,False,no_improvement,5,5,False,False,,False,1.0,1.0,3,1,6766,1067,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 22; to fix: image-alt
+pick: next rule: image-alt
+propose: 5 edit(s): ""<img src=""https://i.dailymail.co.uk/i/furniture/facebook/DailyMail/DailyMail.png"">"" -> ""<img src=""https://i.dailymail.co.uk/i/furniture/facebook/DailyMail/DailyMail.png"" alt=""Daily Mail logo"">""; ""<img data-mol-fe-video-preview="""" data-film="""" data-fps="""" data-frame-count="""" data-frame-height=""382"" data-frame-width…"" -> ""<img data-mol-fe-video-preview="""" data-film="""" data-fps="""" data-frame-count="""" data-frame-height=""382"" data-frame-width…""; ""<img width=""636"" height=""184"" loading=""lazy"" class=""royals-promo-img-wide"" src=""https://i.dailymail.co.uk/static/mol-fe…"" -> ""<img width=""636"" height=""184"" loading=""lazy"" class=""royals-promo-img-wide"" src=""https://i.dailymail.co.uk/static/mol-fe…""; ""<img src=""https://i.dailymail.co.uk/1s/2025/02/06/15/94933645-0-image-m-34_1738854590170.jpg"" class=""thumbnail_img_VjGG…"" -> ""<img src=""https://i.dailymail.co.uk/1s/2025/02/06/15/94933645-0-image-m-34_1738854590170.jpg"" class=""thumbnail_img_VjGG…""; ""<img src=""https://i.dailymail.co.uk/1s/2025/02/06/12/94928287-0-image-m-22_1738845928814.jpg"" class=""thumbnail_img_VjGG…"" -> ""<img src=""https://i.dailymail.co.uk/1s/2025/02/06/12/94928287-0-image-m-22_1738845928814.jpg"" class=""thumbnail_img_VjGG…""
+verify: The rule ""image-alt"" still fails: <img src=""https://i.dailymail.co.uk/1s/2025/02/05/09/94879431-0-image-a-7_1738748766986.jpg"" class=""thumbnail_img_VjGG2HWG""> (Fix any of the following: Element does not have an alt attribute aria-label attribute does not exist or is empty aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty Element has no title attribute Element's default semantics were not o); <img src=""https://i.dailymail.co.uk/1s/2025/02/05/00/94869029-0-image-m-31_1738714333902.jpg"" class=""thumbnail_img_VjGG2HWG""> (Fix any of the following: Element does not have an alt attribute aria-label attribute does not exist or is empty aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty Element has no title attribute Element's default semantics were not o); <img src=""https://i.dailymail.co.uk/1s/2025/02/04/18/94857027-0-image-m-7_1738694084125.jpg"" class=""thumbnail_img_VjGG2HWG""> (Fix any of the following: Element does not have an alt attribute aria-label attribute does not exist or is empty aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty Element has no title attribute Element's default semantics were not o); and 47 more. -> retry
+propose: unusable reply: Your reply was cut off before it finished. Use fewer, shorter edits.
+propose: unusable reply: Your reply was cut off before it finished. Use fewer, shorter edits.
+give_up: left image-alt unfixed (not_fixed)
+pick: nothing left to fix
+report: score 22 -> 22; 0 rule(s) fixed"
+accessguru-178,meta-viewport,Layout,False,ok,3,0,True,True,,False,1.0,1.0,1,1,384,112,fixed after 1 attempt(s),"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: meta-viewport
+pick: next rule: meta-viewport
+propose: 1 edit(s): ""<meta name=""viewport"" content=""width=device-width,initial-scale=1.0,maximum-scale=1.0,viewport-fit=cover"">"" -> ""<meta name=""viewport"" content=""width=device-width,initial-scale=1.0,viewport-fit=cover"">""
+verify: passed -> accept
+accept: fixed meta-viewport in 1 attempt(s)
+pick: nothing left to fix
+report: score 17 -> 14; 1 rule(s) fixed"
+accessguru-180,listitem,Syntax,False,ok,4,0,True,True,,False,1.0,1.0,1,1,551,229,fixed after 1 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 21; to fix: listitem
+pick: next rule: listitem
+propose: 1 edit(s): ""<li class="" osano-cm-list__list-item osano-cm-list-item "">, <li class="" osano-cm-list__list-item osano-cm-list-item "">,…"" -> ""<ul> <li class="" osano-cm-list__list-item osano-cm-list-item "">,</li> <li class="" osano-cm-list__list-item osano-cm-lis…""
+verify: passed -> accept
+accept: fixed listitem in 1 attempt(s)
+pick: nothing left to fix
+report: score 21 -> 17; 1 rule(s) fixed"
+accessguru-187,empty-heading,Syntax,False,no_improvement,2,2,False,False,,False,1.0,1.0,3,3,1393,273,not_fixed after 3 attempt(s),"scan: reused the caller's scan: 5 rule(s) violated, score 16; to fix: empty-heading
+pick: next rule: empty-heading
+propose: 1 edit(s): ""<h2 class=""featured__header""></h2>"" -> ""<h2 class=""featured__header"" aria-label=""Featured content""></h2>""
+verify: Your change made another rule fail, ""region"": <h2 class=""featured__header"" aria-label=""Featured content""></h2> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<h2 class=""featured__header""></h2>"" -> ""<h2 class=""featured__header""><span class=""sr-only"">Featured content</span></h2>""
+verify: Your change made another rule fail, ""region"": <h2 class=""featured__header""><span class=""sr-only"">Featured content</span></h2> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<h2 class=""featured__header""></h2>"" -> ""<h2 class=""featured__header""><span class=""sr-only"">Featured content</span></h2>""
+verify: Your change made another rule fail, ""region"": <h2 class=""featured__header""><span class=""sr-only"">Featured content</span></h2> (Fix any of the following: Some page content is not contained by landmarks). -> give_up
+give_up: left empty-heading unfixed (not_fixed)
+pick: nothing left to fix
+report: score 16 -> 16; 0 rule(s) fixed"
+accessguru-196,aria-input-field-name,Syntax,False,ok,4,3,True,False,region,False,1.0,1.0,3,3,1546,341,improved after 3 attempt(s),"scan: reused the caller's scan: 5 rule(s) violated, score 18; to fix: aria-input-field-name
+pick: next rule: aria-input-field-name
+propose: 1 edit(s): ""<div id=""search-block-wrap"" class=""tablet:grid-col-4"" role=""searchbox"">"" -> ""<div id=""search-block-wrap"" class=""tablet:grid-col-4"" role=""searchbox"" aria-label=""Search"">""
+verify: Your change made another rule fail, ""region"": <div id=""search-block-wrap"" class=""tablet:grid-col-4"" role=""searchbox"" aria-label=""Search""></div> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<div id=""search-block-wrap"" class=""tablet:grid-col-4"" role=""searchbox"">"" -> ""<div id=""search-block-wrap"" class=""tablet:grid-col-4"" role=""searchbox"" aria-label=""Search site""></div>""
+verify: Your change made another rule fail, ""region"": <div id=""search-block-wrap"" class=""tablet:grid-col-4"" role=""searchbox"" aria-label=""Search site""></div> (Fix any of the following: Some page content is not contained by landmarks). -> retry
+propose: 1 edit(s): ""<div id=""search-block-wrap"" class=""tablet:grid-col-4"" role=""searchbox"">"" -> ""<div id=""search-block-wrap"" class=""tablet:grid-col-4"" role=""searchbox"" aria-labelledby=""search-heading""></div>""
+verify: The rule ""aria-input-field-name"" still fails: <div id=""search-block-wrap"" class=""tablet:grid-col-4"" role=""searchbox"" aria-labelledby=""search-heading""></div> (Fix any of the following: aria-label attribute does not exist or is empty aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty Element has no title attribute). -> give_up
+give_up: kept attempt 2: aria-input-field-name is fixed but region now fails (score 4->3)
+pick: nothing left to fix
+report: score 18 -> 17; 0 rule(s) fixed"
+accessguru-205,document-title,Syntax,False,ok,4,0,True,True,,False,1.0,1.0,1,1,324,68,fixed after 1 attempt(s),"scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: document-title
+pick: next rule: document-title
+propose: 1 edit(s): ""<html>"" -> ""<html> <head> <title>Web Page</title> </head>""
+verify: passed -> accept
+accept: fixed document-title in 1 attempt(s)
+pick: nothing left to fix
+report: score 14 -> 10; 1 rule(s) fixed"
+accessguru-207,html-lang-valid,Syntax,False,ok,4,0,True,True,,False,1.0,1.0,1,1,369,107,fixed after 1 attempt(s),"scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: html-lang-valid
+pick: next rule: html-lang-valid
+propose: 1 edit(s): ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE"">"" -> ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de-DE"">""
+verify: passed -> accept
+accept: fixed html-lang-valid in 1 attempt(s)
+pick: nothing left to fix
+report: score 14 -> 10; 1 rule(s) fixed"
+accessguru-233,object-alt,Syntax,False,ok,4,0,True,True,,False,1.0,1.0,1,1,407,109,fixed after 1 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 21; to fix: object-alt
+pick: next rule: object-alt
+propose: 1 edit(s): ""<object aria-labelledby=""download"" data=""/test-assets/moon-audio/moon-speech.mp3""></object>"" -> ""<object aria-label=""Audio recording of a speech about the moon"" aria-labelledby=""download"" data=""/test-assets/moon-audi…""
+verify: passed -> accept
+accept: fixed object-alt in 1 attempt(s)
+pick: nothing left to fix
+report: score 21 -> 17; 1 rule(s) fixed"
+accessguru-248,autocomplete-valid,Syntax,False,ok,4,0,True,True,,False,1.0,1.0,1,1,488,74,fixed after 1 attempt(s),"scan: reused the caller's scan: 6 rule(s) violated, score 21; to fix: autocomplete-valid
+pick: next rule: autocomplete-valid
+propose: 1 edit(s): ""autocomplete=""autocompleteIdentification"""" -> ""autocomplete=""email""""
+verify: passed -> accept
+accept: fixed autocomplete-valid in 1 attempt(s)
+pick: nothing left to fix
+report: score 21 -> 17; 1 rule(s) fixed"

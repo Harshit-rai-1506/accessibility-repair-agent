@@ -15,6 +15,15 @@
     "avg_old_score": 3.65,
     "avg_new_score": 1.8
   },
+  "deletions_fail": {
+    "violations": 40,
+    "score_decrease": 0.4452,
+    "resolved": 17,
+    "target_fixed": 27,
+    "introduced_new_violations": 11,
+    "avg_old_score": 3.65,
+    "avg_new_score": 2.025
+  },
   "element_level": {
     "violations": 26,
     "score_decrease": 0.5288,
