@@ -82,11 +82,12 @@ from .scanner import ScanResult, Scanner, Violation, ViolationNode
 from .scoring import impact_score
 from .verification import judge_fix
 
-MAX_ATTEMPTS = 3          # tries per rule before giving up
+MAX_ATTEMPTS = 3          # tries without progress per rule before giving up
+MAX_TOTAL_ATTEMPTS = 10   # tries per rule in all, including ones that made progress
 MAX_TOOL_ROUNDS = 3       # tool-calling rounds per attempt before the model must submit (Phase 3)
 TOOL_RESULTS_RESERVE = 800    # tokens kept free for tool results when tools are offered
 MAX_RULES = 25            # rules per run, a hard bound on cost
-NODES_SHOWN = 5           # failing elements described to the model per rule
+NODES_SHOWN = 10          # failing elements described to the model per attempt (more follow in later attempts)
 OUTPUT_TOKENS = (1024, 3072)   # min and max reply budget (reasoning + JSON edits)
 BUDGET_MARGIN = 0.9       # plan requests at 90% of the per-request limit; token counts are estimates
 
@@ -118,6 +119,7 @@ class AgentState(TypedDict, total=False):
     done_rules: list[str]         # rules already handled (fixed or not)
     rule: str | None              # the rule being fixed now
     attempt: int                  # attempts made on the current rule
+    stalls: int                   # of those, attempts that made no progress
     candidate: dict | None        # the latest proposed fix and, after verify, its result
     verdict: str                  # verify's decision: accept | retry | give_up
     stop_reason: str              # why the current rule cannot continue, e.g. "too_large"
@@ -144,6 +146,15 @@ class AgentContext:
     max_attempts: int = MAX_ATTEMPTS
     max_rules: int = MAX_RULES
     tools: list | None = None
+    max_total_attempts: int = MAX_TOTAL_ATTEMPTS
+
+    def out_of_tries(self, attempt: int, stalls: int) -> bool:
+        """Stop after ``max_attempts`` tries without progress, or ``max_total_attempts`` in all.
+
+        Attempts that fix some of many failing elements (55 images, say) do not
+        use up the first budget, so a long list can be worked through in batches.
+        """
+        return stalls >= self.max_attempts or attempt >= self.max_total_attempts
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +247,7 @@ async def pick(state: AgentState) -> dict:
                 "steps": _step("pick", "nothing left to fix")}
     rule = queue.pop(0)
     return {
-        "queue": queue, "rule": rule, "attempt": 0, "candidate": None, "verdict": "", "stop_reason": "",
+        "queue": queue, "rule": rule, "attempt": 0, "stalls": 0, "candidate": None, "verdict": "", "stop_reason": "",
         "feedback": None, "candidates": None,            # None = clear (see per_rule_log)
         "outcomes": outcomes,
         "steps": _step("pick", f"next rule: {rule}", rule=rule),
@@ -273,10 +284,11 @@ def reply_budget(violation: dict, model: ModelClient) -> int:
     """Largest reply to allow: enough for one edit per failing element, within the provider's output limit.
 
     A fixed 3,072 tokens cut off replies that had to fix 55 images (dev item
-    accessguru-175). About 150 tokens per element covers a find, a replace and
-    some reasoning.
+    accessguru-175). Long lists are now fixed in batches (NODES_SHOWN per
+    attempt); about 250 tokens per element covers a find, a replace and some
+    reasoning.
     """
-    wanted = 1024 + 150 * violation.get("node_count", 1)
+    wanted = 1024 + 250 * min(violation.get("node_count", 1), 2 * NODES_SHOWN)
     return max(OUTPUT_TOKENS[1], min(model.max_output_tokens, wanted))
 
 
@@ -372,12 +384,13 @@ async def propose(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
     violation = find_violation(state["scan"], rule)
     tool_specs = [convert_to_openai_tool(t) for t in ctx.tools] if ctx.tools else None
     messages, max_tokens, excerpted = build_request(state, violation, ctx.model, tool_specs)
-    out_of_tries = attempt >= ctx.max_attempts
+    stalls = state.get("stalls", 0) + 1          # if this attempt fails, it made no progress
+    out_of_tries = ctx.out_of_tries(attempt, stalls)
 
     def failed(problem: str, edits_text: str = "", usage: list | None = None, detail: str = "") -> dict:
         problem += repeated(state.get("feedback") or [], edits_text)
-        return {"attempt": attempt, "candidate": None, "verdict": "give_up" if out_of_tries else "retry",
-                "usage": usage or [], "feedback": [{"attempt": attempt, "edits": edits_text, "problem": problem}],
+        return {"attempt": attempt, "stalls": stalls, "candidate": None,
+                "verdict": "give_up" if out_of_tries else "retry", "usage": usage or [], "feedback": [{"attempt": attempt, "edits": edits_text, "problem": problem}],
                 "steps": _step("propose", detail or problem, rule=rule, attempt=attempt)}
 
     note = " (HTML excerpted)" if excerpted else ""
@@ -390,10 +403,12 @@ async def propose(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
             records, tool_notes = [record], []
             try:
                 proposal = parse_proposal(reply)
-            except ProposalError as e:
+            except ProposalError as error:
+                failure = error
                 if record.finish_reason == "length":
-                    raise ProposalError("Your reply was cut off before it finished. Use fewer, shorter edits.") from e
-                raise
+                    failure = ProposalError("Your reply was cut off before it finished. Use fewer, shorter edits.")
+                failure.records = records             # the call still cost tokens: count them
+                raise failure from None
     except RequestTooLarge as e:
         return {"attempt": attempt, "candidate": None, "verdict": "give_up", "stop_reason": "too_large",
                 "steps": _step("propose", f"request too large to send: {e}", rule=rule, attempt=attempt)}
@@ -448,12 +463,13 @@ async def verify(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
     progress = (not judgement.passed and not judgement.target_fixed and remaining < before_count
                 and not judgement.introduced and judgement.content_ok)
 
+    stalls = state.get("stalls", 0) + (0 if judgement.passed or progress else 1)
     if judgement.passed:
         verdict = "accept"
-    elif state["attempt"] < runtime.context.max_attempts:
-        verdict = "retry"
-    else:
+    elif runtime.context.out_of_tries(state["attempt"], stalls):
         verdict = "give_up"
+    else:
+        verdict = "retry"
     result = {**candidate, "scan": compact_scan(after), "old_score": judgement.old_score,
               "new_score": judgement.new_score, "target_fixed": judgement.target_fixed,
               "introduced": judgement.introduced, "text_kept": judgement.text_kept,
@@ -466,7 +482,7 @@ async def verify(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
     elif problem:
         problem += repeated(state.get("feedback") or [], edits_text)
     feedback = [{"attempt": state["attempt"], "edits": edits_text, "problem": problem}] if problem else []
-    update = {"candidate": result, "candidates": [result], "verdict": verdict, "feedback": feedback,
+    update = {"candidate": result, "candidates": [result], "verdict": verdict, "feedback": feedback, "stalls": stalls,
               "steps": _step("verify", f"{problem or 'passed'} -> {verdict}", rule=rule, attempt=state["attempt"],
                              score=f"{judgement.old_score}->{judgement.new_score}")}
     if progress:
@@ -572,12 +588,13 @@ def build_graph(checkpointer=None):
     return graph.compile(checkpointer=checkpointer, name="accessibility-repair-agent")
 
 
-def recursion_limit(max_attempts: int = MAX_ATTEMPTS, max_rules: int = MAX_RULES) -> int:
-    """LangGraph stops any run after this many steps: a second safety net behind max_attempts.
+def recursion_limit(max_attempts: int = MAX_ATTEMPTS, max_rules: int = MAX_RULES,
+                    max_total_attempts: int = MAX_TOTAL_ATTEMPTS) -> int:
+    """LangGraph stops any run after this many steps: a second safety net behind the attempt limits.
 
-    Per rule: pick, up to max_attempts x (propose + verify), accept or give_up.
+    Per rule: pick, up to max_total_attempts x (propose + verify), accept or give_up.
     """
-    return 4 + max_rules * (2 * max_attempts + 2)
+    return 4 + max_rules * (2 * max(max_attempts, max_total_attempts) + 2)
 
 
 def mermaid() -> str:

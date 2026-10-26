@@ -46,16 +46,17 @@ Every method run on the same model and the same 40 items:
 |---|---|---|---|---|---|---|
 | Zero-shot prompt | 0.61 | 0.60 | 23/40 | 7 | 2 | 1,825 |
 | AccessGuru prompting (ASSETS 2025) | 0.75 | **0.47** | 29/40 | 5 | **11** | 25,510 |
-| Our agent (Phase 2) | 0.59 | 0.59 | 23/40 | 2 | 0 | 4,036 |
-| **Our agent with MCP tools** (Phase 3) | **0.67** | **0.67** | 27/40 | **1** | **0** | 9,998 |
+| Our agent (Phase 2) | 0.66 | 0.66 | 26/40 | **0** | **0** | 2,735 |
+| **Our agent with MCP tools** (Phase 3) | **0.72** | **0.72** | 28/40 | 1 | **0** | 11,839 |
 
 Score decrease is 1 − (violation score after ÷ before), from the AccessGuru
 paper: 1.0 means every target fixed with nothing broken. The metric alone
 rewards deleting the broken element, so the second column scores a fix that
 removed content as no fix: AccessGuru's lead comes from deletions (11 of 40
-items). An error analysis of the agent's failures on these runs led to five
-fixes (see [docs/02-agent.md §14](docs/02-agent.md#14-error-analysis-round-1));
-the agent runs are being repeated with them. Full tables, per-item outcomes
+items). The agent rows are after one round of error analysis
+([docs/02-agent.md §14–15](docs/02-agent.md#14-error-analysis-round-1));
+a second round of fixes (for page-level rules) is in and will be measured
+with Phase 4. Full tables, per-item outcomes
 and the agent's step traces: [results/accessguru-dev](results/accessguru-dev/README.md).
 The test set is held back until the end.
 
@@ -109,7 +110,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 156 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 159 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```

@@ -221,8 +221,36 @@ def test_reply_budget_grows_with_failing_elements():
     groq = ModelClient("groq:openai/gpt-oss-120b", llm=object())
     mistral = ModelClient("mistralai:mistral-small-2603", llm=object())
     assert reply_budget({"node_count": 1}, mistral) == 3072
-    assert reply_budget({"node_count": 55}, mistral) > 9000          # dev item accessguru-175: 55 images
+    assert reply_budget({"node_count": 55}, mistral) > 5000          # dev item accessguru-175: 55 images, in batches
     assert reply_budget({"node_count": 55}, groq) <= groq.max_output_tokens
+
+
+def test_long_lists_are_fixed_in_batches():
+    """25 failing images, 10 listed per attempt: batches that make progress do not use up the 3 tries."""
+    import re as _re
+    images = "".join(f'<img src="p{i}.png">' for i in range(25))
+    page = IMG_ONLY.replace('<img src="cat.png">', images)
+
+    def fix_listed(prompt):
+        listed = _re.findall(r'^\d+\. <img src="(p\d+)\.png">', prompt, _re.M)
+        return proposal(*[(f'<img src="{n}.png">', f'<img src="{n}.png" alt="Photo {n}">') for n in listed])
+    state, llm = run_agent(page, [fix_listed], targets=["image-alt"])
+    assert outcome(state, "image-alt")["status"] == "fixed"
+    assert outcome(state, "image-alt")["attempts"] == 3 and llm.calls == 3        # 10 + 10 + 5
+    assert "the first 10 of 25" in llm.prompts[0]
+
+
+def test_anchor_tokens_never_reach_the_page():
+    wrap = proposal(("<<start>>", "<<start>><main>"), ("<<end>>", "</main><<end>>"))
+    page = '<!doctype html><html lang="en"><head><title>T</title></head><body><h1>T</h1><p>Text here.</p></body></html>'
+    state, _ = run_agent(page, [wrap], targets=["region"])
+    assert "<<" not in state["current_html"]
+    assert outcome(state, "region")["status"] == "fixed"
+
+
+def test_failed_attempts_still_count_their_tokens():
+    state, llm = run_agent(IMG_ONLY, ["not json"], targets=["image-alt"], max_attempts=2)
+    assert len(state["usage"]) == 2 == llm.calls
 
 
 def test_feedback_says_how_to_pass_a_newly_broken_rule():

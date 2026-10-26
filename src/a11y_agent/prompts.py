@@ -221,7 +221,7 @@ _EDITS = """Each edit replaces one piece of the HTML: "find" is text copied exac
 
 _RULES = """Rules:
 - The HTML may be only a fragment of a page: it is exactly what is shown, and may lack <head>, <body> or closing tags.
-- Fix every failing element, not only the ones listed.
+- Fix every failing element listed. When many elements fail, only the first ones are listed; fix those now, and the rest come in the next attempts.
 - Change as little as possible: prefer small edits over rewriting the HTML.
 - Keep every element and all visible text. Never make a problem go away by deleting, emptying or hiding content (display:none, visibility:hidden, aria-hidden="true", role="presentation" or role="none").
 - Your change must not make any other rule fail. For example, if the HTML has no landmarks, put new visible content (such as a heading) inside one, like <main>.
@@ -248,7 +248,7 @@ AGENT_USER = """Problem: the axe-core rule "{rule_id}" fails (impact: {impact}).
 Rule: {help}. {description}
 WCAG success criteria: {criteria}
 
-Failing elements ({shown} of {total}; fix all {total}), each with the checker's explanation:
+{elements_header}, each with the checker's explanation:
 {elements}
 
 {html_label}
@@ -292,6 +292,12 @@ def pass_conditions(rule_id: str) -> str:
         return ""
 
 
+def _elements_header(shown: int, total: int) -> str:
+    if total > shown:
+        return f"Failing elements: the first {shown} of {total} (fix these now; the rest come in the next attempts)"
+    return f"Failing elements ({total}; fix all of them)"
+
+
 def _indent(text: str, prefix: str = "   ") -> str:
     return "\n".join(prefix + line for line in text.strip().splitlines())
 
@@ -324,7 +330,7 @@ def agent_messages(violation: dict, html: str, *, excerpted: bool = False,
     user = AGENT_USER.format(
         rule_id=rule_id, impact=violation.get("impact") or "unknown", help=help_text.rstrip("."),
         description=description, criteria=", ".join(violation.get("criteria") or []) or "best practice",
-        shown=len(violation["nodes"]), total=violation.get("node_count", len(violation["nodes"])),
+        elements_header=_elements_header(len(violation["nodes"]), violation.get("node_count", len(violation["nodes"]))),
         elements=elements, html_label=AGENT_EXCERPT_LABEL if excerpted else AGENT_HTML_LABEL,
         html=html, history=history,
     )

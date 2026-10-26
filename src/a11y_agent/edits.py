@@ -37,6 +37,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 # ---------------------------------------------------------------------------
 
 START, END = "<<start>>", "<<end>>"     # special "find" values: insert at the beginning / end of the HTML
+_ANCHOR = re.compile(r"<<\s*(?:start|end)\s*>>", re.I)
 
 
 class Edit(BaseModel):
@@ -193,11 +194,14 @@ def apply_edits(html: str, edits: list[Edit]) -> str:
     result, problems = html, []
     for number, edit in enumerate(edits, start=1):
         anchor = edit.find.strip().lower()
+        # Models often repeat the anchor in the replacement ("<<start>>" -> "<<start>><main>"),
+        # as if it were text being replaced. It never belongs in the page, so it is removed.
+        replace = _ANCHOR.sub("", edit.replace)
         if anchor == START:
-            result = edit.replace + result
+            result = replace + result
             continue
         if anchor == END:
-            result = result + edit.replace
+            result = result + replace
             continue
         if not edit.find.strip():
             problems.append(f"Edit {number}: the find text is empty.")
@@ -214,7 +218,7 @@ def apply_edits(html: str, edits: list[Edit]) -> str:
                             "of the surrounding HTML so it matches only one place.")
         else:
             for start, end in reversed(spans):          # from the end, so earlier positions stay valid
-                result = result[:start] + edit.replace + result[end:]
+                result = result[:start] + replace + result[end:]
     if problems:
         raise EditError(problems)
     return result

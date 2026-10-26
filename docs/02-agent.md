@@ -446,6 +446,35 @@ element. Scored with deletions as failures, AccessGuru drops from 0.75 to
 
 ---
 
+## 15. Error analysis, round 2
+
+After the round-1 fixes (Mistral Small 4, same 40 items):
+
+| Method | Score | Deletions count as failures | Element-level only | Page-level only | Broke another rule |
+|---|---|---|---|---|---|
+| zero_shot | 0.61 | 0.60 | 0.62 | 0.60 | 7 |
+| agent | 0.59 → **0.66** | 0.66 | 0.62 → **0.79** | 0.50 → 0.36 | 0 |
+| agent_tools | 0.67 → **0.72** | 0.72 | 0.65 → **0.78** | 0.72 → 0.57 | 1 |
+
+The agent now beats zero-shot, which is what Phase 2 set out to show, and
+element-level fixes improved most. Page-level fixes got worse, and the traces
+showed why: the model repeats the new anchor in its replacement
+(`"<<start>>" -> "<<start>><main>"`), so a literal `<<start>>` ended up in the
+page as stray content outside the new landmark (29 traces). Two smaller
+problems also showed up:
+
+| Problem | Fix |
+|---|---|
+| Anchor text copied into the page | Anchors are removed from every replacement before it is applied |
+| 55 or 84 failing images: replies still cut off when the model tried to fix them all at once | The prompt lists the first 10 failing elements and says the rest come next; attempts that make progress no longer count towards the 3 tries (at most 10 attempts per rule in all) |
+| A cut-off reply's tokens were not counted (it showed 0 calls) | The cost of every failed attempt is recorded |
+
+A lesson about evaluation itself: a fix can help one group of items and hurt
+another, so the report shows element-level and page-level results separately,
+and every change is re-measured on all 40 items.
+
+---
+
 ## What you can now explain
 
 - **Workflow versus agent**, and why a verified loop is the right amount of autonomy here.
