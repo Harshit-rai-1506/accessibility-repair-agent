@@ -152,7 +152,7 @@ Windows.
 **Guide:** [docs/00-setup.md](00-setup.md)
 **Done when:** `check_setup.py` passes on your laptop and CI is green.
 
-### Phase 1: Benchmark and baseline ✅ built
+### Phase 1: Benchmark and baseline ✅
 
 **Built**
 - `benchmark.py`: reproducibility scan and a seeded, rule-stratified split,
@@ -174,26 +174,53 @@ tier's 8,000-token request limit, 3 dev items are too large for zero-shot and
 about 9 for AccessGuru, whose multi-turn conversation costs about 8 times the
 tokens (~42K vs ~350K for the dev set).
 
+**Measured on the dev set** (gpt-oss-120b, free tier; `results/accessguru-dev/`):
+
+| Method | Items | Score decrease | Resolved | Broke another rule | Dropped content | Too large | Tokens per item |
+|---|---|---|---|---|---|---|---|
+| A zero-shot | 40/40 | 0.51 | 21 | 11 | 5 | 3 | 930 |
+| B AccessGuru | 14/40 (quota) | 0.40 | 6 | 0 | 3 | 7 | 12,647 |
+
+On the 7 items both could send: A 0.83, B 0.87 at about 40 times the tokens.
+The failure modes (broken rules, deleted content, requests too large) shaped
+Phase 2. B continues from item 15 on its next run.
+
 **Concepts:** evaluation harnesses, caching, rate limits, parsing model output,
 dev/test discipline.
-**Done when:** a table with methods A and B on the dev set. *Remaining:* the
-first runs with a real key (zero-shot in one sitting; AccessGuru over two days
-of free quota).
+**Done when:** a table with methods A and B on the dev set. ✅
 
-### Phase 2: The LangGraph agent (about 4–5 hours)
+### Phase 2: The LangGraph agent ✅ built
 
-**Build**
-- Typed state: the HTML, the violations, the one being fixed, attempts,
-  candidate fix, scan results, feedback from failed attempts.
-- Nodes: `scan` → `pick_violation` → `propose_fix` (structured output:
-  fixed HTML + explanation) → `verify` (re-scan, score) → conditional edge:
-  accept, retry with the scanner's feedback, or give up after N tries →
-  `report`.
-- A checkpointer so a long run can resume, and traces of every step.
+**Built**
+- `agent.py`: a `StateGraph` with typed, serializable state and reducers
+  (`operator.add` for results, a custom per-rule reducer for feedback); nodes
+  `scan` → `pick` → `propose` → `verify` → `accept` / `give_up` → `report`;
+  conditional edges for the retry loop, bounded by `max_attempts` (3) and
+  `recursion_limit`; scanner and model passed as runtime context; streaming
+  steps; CLI that fixes a whole page.
+- `edits.py`: structured output as JSON edits (Pydantic `FixProposal`, sent as a
+  strict JSON schema), all-or-nothing application, excerpts of long pages.
+- `verify` passes a fix only if the target rule is gone, nothing else newly
+  fails, and 90% of words and elements remain (`content.py`); failures are fed
+  back with axe-core's own explanation.
+- Checkpoints: `AsyncSqliteSaver` with `--thread` resumes a stopped run;
+  `InMemorySaver` and `--history` show the state after each step.
+- `model_client.py`: `response_format` support, fallback when a provider
+  rejects schemas, `BadReply` for schema failures.
+- `methods.py`: method C (`agent`); `check_setup.py` checks the model returns
+  usable edits. Guide: [docs/02-agent.md](02-agent.md). 116 tests.
+
+**Measured while building:** the agent's first-attempt prompt averages about
+1,060 estimated tokens on dev (zero-shot: about 690), but its replies are short
+edits, and every dev item fits the free-tier request limit (the largest
+benchmark snippet, about 10,800 tokens, becomes a 4,700-token request).
 
 **Concepts:** graphs versus chains, typed state and reducers, conditional
-edges, bounded loops, checkpointing, structured outputs, tracing.
-**Done when:** method C beats method A on the dev set; graph diagram saved.
+edges, bounded loops, structured outputs, context budgets, runtime context,
+checkpointing, streaming and tracing, testing with fake models.
+**Done when:** method C beats method A on the dev set (graph diagram:
+[docs/02-agent.md §3](02-agent.md#3-the-graph)). *Remaining:* the first dev
+run with a real key (`evaluate run --method agent`).
 
 ### Phase 3: MCP tools (about 3 hours)
 
@@ -285,8 +312,10 @@ Estimated from the real prompts and snippets (Phase 1; see
   needs two (runs resume automatically).
 - **Paid (optional, final runs):** at $0.15 / $0.60 per million input/output
   tokens for gpt-oss-120b, the whole test-set comparison costs well under $1,
-  and removes the `too_large` limit. The agent's real cost per item gets
-  measured in Phase 2.
+  and removes the `too_large` limit.
+- **Measured:** zero-shot used 37K tokens for the 40 dev items; AccessGuru
+  used 177K for its first 14 (one day's quota). The agent is estimated at
+  60–120K for the dev set.
 
 ---
 

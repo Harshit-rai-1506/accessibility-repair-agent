@@ -9,8 +9,8 @@ small interface is what makes the comparison fair: only the method changes.
     zero_shot   one model call: rule name + help text, "return the corrected HTML"
     accessguru  the published AccessGuru method: persona + 4-step conversation,
                 one corrective re-prompt if the fix fails, best candidate kept
-
-Phase 2 adds our LangGraph agent as another method behind this interface.
+    agent       our LangGraph agent (Phase 2): JSON edits, verified by re-scanning,
+                retried with the scanner's feedback, up to 3 attempts
 """
 
 from __future__ import annotations
@@ -150,7 +150,44 @@ class AccessGuru:
                          response=reply, passes=passes, note=note or f"kept {label}")
 
 
-METHODS: dict[str, type] = {m.name: m for m in (NoOp, ZeroShot, AccessGuru)}
+class AgentMethod:
+    """Method C: the LangGraph agent from ``agent.py``, asked to fix one rule.
+
+    The graph runs with ``targets=[the benchmark rule]`` and the harness's own
+    scan passed in, so the agent and the harness start from the same picture.
+    """
+    name = "agent"
+    uses_model = True
+    max_attempts = 3
+    _graph = None
+
+    @classmethod
+    def graph(cls):
+        if cls._graph is None:
+            from .agent import build_graph
+            cls._graph = build_graph()            # no checkpointer: the harness saves results per item
+        return cls._graph
+
+    async def fix(self, item: BenchmarkItem, ctx: FixContext) -> FixResult:
+        from .agent import AgentContext, compact_scan, run_config
+
+        state = await self.graph().ainvoke(
+            {"html": item.html, "targets": [item.rule_id], "scan": compact_scan(ctx.before)},
+            run_config(max_attempts=self.max_attempts, max_rules=1, run_name=f"agent:{item.id}",
+                       tags=["a11y-agent", "evaluation"], metadata={"item": item.id, "rule": item.rule_id}),
+            context=AgentContext(scanner=ctx.scanner, model=ctx.model, max_attempts=self.max_attempts, max_rules=1),
+        )
+        calls = [CallRecord(**u) for u in state.get("usage", [])]
+        outcome = next((o for o in state.get("outcomes", []) if o["rule_id"] == item.rule_id), {})
+        kind = outcome.get("status", "not_fixed")
+        trace = "\n".join(f"{s['node']}: {s['detail']}" for s in state.get("steps", []))
+        status = {"fixed": "ok", "improved": "ok", "too_large": "too_large"}.get(kind, "no_improvement")
+        html = state["current_html"] if kind in ("fixed", "improved") else item.html
+        return FixResult(html=html, status=status, calls=calls, response=trace,
+                         passes=outcome.get("attempts", 0), note=f"{kind} after {outcome.get('attempts', 0)} attempt(s)")
+
+
+METHODS: dict[str, type] = {m.name: m for m in (NoOp, ZeroShot, AccessGuru, AgentMethod)}
 
 
 def get_method(name: str) -> Method:

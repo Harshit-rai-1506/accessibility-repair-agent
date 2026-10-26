@@ -294,13 +294,16 @@ command that fixes it. A healthy run looks like:
 
 ```
 Python               OK    3.12.x
-Packages             OK    14/14 importable
+Packages             OK    15/15 importable
 Resources            OK    axe-core 4.12.1, benchmark 7 files, WCAG corpus 625 files, axe rules 107 files
 Documents            OK    benchmark 305 + 171 rows, WCAG 581 pages, axe 105 rules
 Browser + scanner    OK    broken example: 12 rules violated (score 44); fixed example: 0
 Model config         OK    MODEL=groq:openai/gpt-oss-120b
 Model call           OK    replied "ready" in 0.6 s
+Agent reply          OK    usable JSON edits (schema enforced by the provider): <img src="logo.png" alt="...">
 ```
+
+(The last two lines need your key; "Agent reply" was added in Phase 2.)
 
 The **41 tests** cover the scoring rules (with hand-made scan results, no
 browser needed), the real scanner on both example pages, end-to-end fix

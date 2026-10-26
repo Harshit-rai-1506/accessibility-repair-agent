@@ -21,6 +21,7 @@ dependencies = [
     "langchain>=1.4,<2",
     "langchain-core>=1.6,<2",
     "langgraph>=1.2,<2",
+    "langgraph-checkpoint-sqlite>=3.0,<4",   # saved checkpoints: resume a stopped run
     "langchain-groq>=1.1,<2",      # free hosted open-weight models (default)
     "langchain-ollama>=1.1,<2",    # optional fully-local models
     # Phase 3: Model Context Protocol (our own tool server + client adapter)

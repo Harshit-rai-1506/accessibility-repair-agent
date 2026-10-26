@@ -19,7 +19,14 @@ three things a plain ``llm.invoke()`` does not give you:
   ``RequestTooLarge`` (the row is scored as not fixed and counted). Running out
   of the daily quota raises ``QuotaExhausted`` and a rejected key raises
   ``AuthFailed``; both stop the run cleanly. Finished rows are kept, so running
-  the same command later continues where it stopped.
+  the same command later continues where it stopped. A reply the provider
+  itself rejects as not matching the requested JSON schema raises
+  ``BadReply``, which the agent treats as one failed attempt.
+
+**Structured output.** ``chat(..., response_format=schema)`` asks the provider
+to constrain the reply to a JSON schema (Groq and OpenAI: ``response_format``;
+Ollama: ``format``). The reply is still returned as text, so it is cached like
+any other; the caller validates it (the agent uses Pydantic).
 """
 
 from __future__ import annotations
@@ -56,6 +63,10 @@ class QuotaExhausted(StopRun):
 
 class AuthFailed(StopRun):
     """The API key is missing, wrong or revoked."""
+
+
+class BadReply(Exception):
+    """The provider rejected the model's own output (e.g. JSON that does not match the schema)."""
 
 
 def estimate_tokens(text: str) -> int:
@@ -163,7 +174,8 @@ _WAIT = re.compile(r"try again in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?", re.I)
 
 
 def _error_kind(error: Exception) -> tuple[str, float | None]:
-    """Classify a provider error as 'too_large', 'daily', 'minute' or 'other'."""
+    """Classify a provider error: 'auth', 'too_large', 'bad_output', 'format_unsupported',
+    'daily', 'minute' or 'other'."""
     status = getattr(error, "status_code", None) or getattr(getattr(error, "response", None), "status_code", None)
     text = str(error).lower()
     wait = None
@@ -173,8 +185,13 @@ def _error_kind(error: Exception) -> tuple[str, float | None]:
         wait = h * 3600 + mi * 60 + s
     if status in (401, 403) or "invalid api key" in text or "invalid_api_key" in text:
         return "auth", wait
-    if status == 413 or "request too large" in text or "context_length" in text or "maximum context" in text:
+    if (status == 413 or "request too large" in text or "context_length" in text
+            or "maximum context" in text or "reduce the length" in text):
         return "too_large", wait
+    if "json_validate_failed" in text or "does not match the expected schema" in text:
+        return "bad_output", wait
+    if status == 400 and ("response_format" in text or "json_schema" in text):
+        return "format_unsupported", wait
     if status == 429 or "rate limit" in text or "rate_limit" in text:
         if "per day" in text or "(tpd)" in text or "(rpd)" in text:
             return "daily", wait
@@ -202,6 +219,7 @@ class ModelClient:
         self.max_request_tokens = settings.max_request_tokens if max_request_tokens is None else max_request_tokens
         self.minute_retries = minute_retries
         self.params = {"temperature": 0.0, "reasoning_effort": settings.reasoning_effort}
+        self.native_schema = True       # set to False if the provider rejects response_format
 
     @property
     def llm(self):
@@ -214,8 +232,23 @@ class ModelClient:
         plus room for the model's reasoning."""
         return min(settings.max_output_tokens, 2 * estimate_tokens(html) + 1024)
 
-    async def chat(self, messages: Messages, *, max_tokens: int) -> tuple[str, CallRecord]:
+    def _structured_kwargs(self, response_format: dict) -> dict:
+        """How each provider is asked for JSON that matches a schema."""
+        provider = self.spec.split(":", 1)[0].lower()
+        if provider == "ollama":
+            return {"format": response_format["json_schema"]["schema"]}
+        return {"response_format": response_format}       # Groq, OpenAI (and the test fakes ignore it)
+
+    async def chat(self, messages: Messages, *, max_tokens: int,
+                   response_format: dict | None = None) -> tuple[str, CallRecord]:
+        """Send one request; returns (reply text, what it cost).
+
+        ``response_format`` is an OpenAI-style ``{"type": "json_schema", ...}``
+        dict; when given, the provider constrains the reply to that schema.
+        """
         params = {**self.params, "max_tokens": max_tokens}
+        if response_format is not None:          # only then, so older cache entries stay valid
+            params["response_format"] = response_format
         key = ResponseCache.key(self.spec, params, messages)
         if self.cache is not None and (hit := self.cache.get(key)) is not None:
             return hit["text"], CallRecord(hit["input_tokens"], hit["output_tokens"], 0.0, True,
@@ -227,26 +260,37 @@ class ModelClient:
 
         lc_messages = [{"system": SystemMessage, "human": HumanMessage, "ai": AIMessage}[role](content=text)
                        for role, text in messages]
+        use_schema = response_format is not None and self.native_schema
+        extra = self._structured_kwargs(response_format) if use_schema else {}
         expected = messages_tokens(messages) + min(max_tokens, 1500)
-        for attempt in range(self.minute_retries + 1):
+        attempt = 0
+        while True:
             event = await self.limiter.acquire(expected)
             start = time.perf_counter()
             try:
-                reply = await self.llm.ainvoke(lc_messages, max_tokens=max_tokens)
+                reply = await self.llm.ainvoke(lc_messages, max_tokens=max_tokens, **extra)
                 break
             except Exception as error:
                 self.limiter.settle(event, expected)
                 kind, wait = _error_kind(error)
+                if kind == "format_unsupported" and extra:
+                    # This model or provider cannot constrain output to a schema. The prompt
+                    # already describes the JSON, so ask again without the option, and remember.
+                    self.native_schema, extra = False, {}
+                    continue
                 if kind == "auth":
                     raise AuthFailed(f"the provider rejected the API key ({str(error).splitlines()[0][:150]}); "
                                      "check GROQ_API_KEY in .env") from error
                 if kind == "too_large":
                     raise RequestTooLarge(str(error).splitlines()[0][:300]) from error
+                if kind == "bad_output":
+                    raise BadReply(str(error).splitlines()[0][:300]) from error
                 if kind == "daily":
                     hint = f" (the provider suggests trying again in {wait / 60:.0f} minutes)" if wait else ""
                     raise QuotaExhausted(f"daily limit reached{hint}: {str(error).splitlines()[0][:200]}") from error
                 if kind == "minute" and attempt < self.minute_retries:
-                    await asyncio.sleep(min(wait or 20.0 * (attempt + 1), 90.0))
+                    attempt += 1
+                    await asyncio.sleep(min(wait or 20.0 * attempt, 90.0))
                     continue
                 raise
         seconds = time.perf_counter() - start

@@ -1,6 +1,6 @@
 """Check that everything needed to build and run the agent is in place.
 
-    python scripts/check_setup.py              # full check, including one model call
+    python scripts/check_setup.py              # full check, including two tiny model calls
     python scripts/check_setup.py --skip-llm   # no API key needed (used in CI)
 
 Each line prints OK, FAIL or SKIP with a hint on how to fix failures.
@@ -23,6 +23,7 @@ PACKAGES = [
     ("playwright", "browser automation"),
     ("langchain", "model interface"),
     ("langgraph", "agent graph"),
+    ("langgraph.checkpoint.sqlite", "saved agent checkpoints"),
     ("markdownify", "HTML to Markdown"),
     ("langchain_groq", "Groq models"),
     ("langchain_ollama", "local models (optional)"),
@@ -194,6 +195,28 @@ def check_model_call(spec: str) -> None:
                "check the key, the model name, and your internet connection")
 
 
+def check_agent_reply(spec: str) -> None:
+    """One real request in the agent's format: does the model return usable JSON edits?"""
+    try:
+        from a11y_agent.edits import apply_edits, parse_proposal, proposal_format
+        from a11y_agent.model_client import ModelClient
+        from a11y_agent.prompts import agent_messages
+
+        html = '<img src="logo.png">'
+        violation = {"rule_id": "image-alt", "impact": "critical", "help": "Images must have alternative text",
+                     "criteria": ["1.1.1"], "node_count": 1,
+                     "nodes": [{"html": html, "summary": "Element does not have an alt attribute"}]}
+        client = ModelClient(spec)
+        reply, record = asyncio.run(client.chat(agent_messages(violation, html), max_tokens=1024,
+                                                response_format=proposal_format()))
+        fixed = apply_edits(html, parse_proposal(reply).edits)
+        how = "schema enforced by the provider" if client.native_schema else "no schema support; prompt only"
+        report("Agent reply", "OK", f"usable JSON edits ({how}): {fixed[:60]}")
+    except Exception as e:
+        report("Agent reply", "FAIL", str(e).splitlines()[0][:160],
+               "the model did not return usable edits; try again, or try FALLBACK_MODEL in .env")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--skip-llm", action="store_true", help="skip the model key and model call checks")
@@ -209,12 +232,15 @@ def main() -> int:
     if args.skip_llm:
         report("Model config", "SKIP", "--skip-llm")
         report("Model call", "SKIP", "--skip-llm")
+        report("Agent reply", "SKIP", "--skip-llm")
     else:
         spec = check_model_config()
         if spec:
             check_model_call(spec)
+            check_agent_reply(spec)
         else:
             report("Model call", "SKIP", "fix the model config first")
+            report("Agent reply", "SKIP", "fix the model config first")
 
     print()
     if failures:

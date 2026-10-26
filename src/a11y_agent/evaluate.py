@@ -39,11 +39,10 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from bs4 import BeautifulSoup
-
 from .benchmark import BenchmarkItem, load_split
 from .config import ROOT, settings
-from .methods import FixContext, FixResult, get_method
+from .content import DROPPED_CONTENT, content_kept
+from .methods import METHODS, FixContext, FixResult, get_method
 from .model_client import ModelClient, RateLimiter, ResponseCache, StopRun
 from .scanner import Scanner
 from .scoring import FixOutcome, evaluate_fix, summarize
@@ -64,33 +63,6 @@ def model_slug(spec: str | None) -> str:
 
 def run_dir(dataset: str, split: str, method: str, model: str | None) -> Path:
     return settings.runs_dir / f"{dataset}-{split}" / f"{method}__{model_slug(model)}"
-
-
-# ---------------------------------------------------------------------------
-# Did the fix keep the content?
-# ---------------------------------------------------------------------------
-
-def content_kept(original: str, fixed: str) -> tuple[float, float]:
-    """(share of the original's words still present, share of its elements still present).
-
-    The metric only asks "is the violation gone?". Deleting the offending
-    elements makes it go, so we also measure how much of the original survives.
-    Low values flag fixes that "work" by removing content.
-    """
-    def words(html: str) -> Counter:
-        return Counter(BeautifulSoup(html, "html.parser").get_text(" ").lower().split())
-
-    def tags(html: str) -> Counter:
-        return Counter(t.name for t in BeautifulSoup(html, "html.parser").find_all(True))
-
-    w0, t0 = words(original), tags(original)
-    w1, t1 = words(fixed), tags(fixed)
-    text = sum((w0 & w1).values()) / sum(w0.values()) if w0 else 1.0
-    elements = sum((t0 & t1).values()) / sum(t0.values()) if t0 else 1.0
-    return round(text, 3), round(elements, 3)
-
-
-DROPPED_CONTENT = 0.9   # below this share of words or elements kept, a fix is flagged
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="run one method over a split")
-    run.add_argument("--method", required=True, choices=["noop", "zero_shot", "accessguru"])
+    run.add_argument("--method", required=True, choices=sorted(METHODS))
     run.add_argument("--dataset", default="accessguru", choices=["accessguru", "access"])
     run.add_argument("--split", default="dev", choices=["dev", "test"])
     run.add_argument("--model", help="provider:model (default: MODEL from .env)")
