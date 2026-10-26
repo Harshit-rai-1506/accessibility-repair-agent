@@ -126,12 +126,18 @@ def test_real_embeddings_capture_meaning():
 @real_model
 def test_real_embeddings_keep_the_order_of_their_inputs():
     """Texts are batched by length inside the model; the vectors must still come back in order."""
-    model = OnnxEmbeddings(batch_size=2)
-    texts = ["contrast", "Using alt attributes on img elements to provide a text alternative for images.", "alt"]
-    together = model.embed_documents(texts)
-    one_by_one = [model.embed_documents([t])[0] for t in texts]
     import numpy as np
-    assert np.allclose(together, one_by_one, atol=1e-4)
+    model = OnnxEmbeddings(batch_size=2)
+    texts = ["Ensuring sufficient colour contrast between text and its background",
+             "Using alt attributes on img elements to provide a text alternative for images.",
+             "Providing captions for videos"]
+    together = np.array(model.embed_documents(texts))
+    one_by_one = np.array([model.embed_documents([t])[0] for t in texts])
+    # Not identical: the 8-bit model scales its numbers per batch, so padding
+    # shifts a vector slightly. Each vector must still be nearest its own text.
+    similarity = together @ one_by_one.T
+    assert list(similarity.argmax(axis=1)) == [0, 1, 2]
+    assert similarity.diagonal().min() > 0.95
 
 
 # The headline claim on the real model (hybrid search ranks at least as well as

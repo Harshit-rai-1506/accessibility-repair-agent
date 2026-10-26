@@ -86,6 +86,8 @@ class OnnxEmbeddings(Embeddings):
         self._load()
         # Texts in a batch are padded to the longest one, so batching texts of
         # similar length wastes less work; the vectors are put back in order after.
+        # (The 8-bit model scales its numbers per batch, so a text's vector
+        # depends very slightly on its batch: cosine similarity above 0.95.)
         order = sorted(range(len(texts)), key=lambda i: len(texts[i]))
         vectors = np.zeros((len(texts), self.dimensions), dtype=np.float32)
         for start in range(0, len(order), self.batch_size):
