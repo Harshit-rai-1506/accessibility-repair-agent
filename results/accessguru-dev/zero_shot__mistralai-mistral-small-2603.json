@@ -1,0 +1,59 @@
+{
+  "method": "zero_shot",
+  "model": "mistralai:mistral-small-2603",
+  "dataset": "accessguru",
+  "split": "dev",
+  "complete": true,
+  "items_done": 40,
+  "items_total": 40,
+  "all": {
+    "violations": 40,
+    "score_decrease": 0.6096,
+    "resolved": 23,
+    "target_fixed": 30,
+    "introduced_new_violations": 7,
+    "avg_old_score": 3.65,
+    "avg_new_score": 1.425
+  },
+  "element_level": {
+    "violations": 26,
+    "score_decrease": 0.6154,
+    "resolved": 15,
+    "target_fixed": 17,
+    "introduced_new_violations": 2,
+    "avg_old_score": 4.0,
+    "avg_new_score": 1.538
+  },
+  "by_category": {
+    "Layout": {
+      "violations": 12,
+      "score_decrease": 0.4255,
+      "resolved": 5,
+      "target_fixed": 5,
+      "introduced_new_violations": 0,
+      "avg_old_score": 3.917,
+      "avg_new_score": 2.25
+    },
+    "Syntax": {
+      "violations": 28,
+      "score_decrease": 0.697,
+      "resolved": 18,
+      "target_fixed": 25,
+      "introduced_new_violations": 7,
+      "avg_old_score": 3.536,
+      "avg_new_score": 1.071
+    }
+  },
+  "status": {
+    "ok": 39,
+    "truncated": 1
+  },
+  "dropped_content": 2,
+  "calls": 40,
+  "input_tokens": 38812,
+  "output_tokens": 34191,
+  "model_seconds": 187.1,
+  "paid_cost_usd": 0.0263,
+  "axe_version": "4.12.1",
+  "tokens_per_item": 1825
+}
