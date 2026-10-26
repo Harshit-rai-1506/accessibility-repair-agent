@@ -1,0 +1,47 @@
+# Temporary: look up embedding-model files on Hugging Face (not reachable from the dev sandbox).
+name: probe
+on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install onnxruntime tokenizers numpy
+      - shell: python
+        run: |
+          import hashlib, json, time, urllib.request
+          import numpy as np
+          def get(url):
+              with urllib.request.urlopen(url, timeout=120) as r:
+                  return r.read()
+          for repo in ["BAAI/bge-small-en-v1.5", "Xenova/bge-small-en-v1.5", "sentence-transformers/all-MiniLM-L6-v2"]:
+              meta = json.loads(get(f"https://huggingface.co/api/models/{repo}"))
+              files = [s["rfilename"] for s in meta.get("siblings", []) if "onnx" in s["rfilename"] or s["rfilename"] in ("tokenizer.json", "config.json")]
+              print(f"::notice title={repo} sha::{meta.get('sha')} license={meta.get('cardData', {}).get('license')} files={files}")
+          repo = "Xenova/bge-small-en-v1.5"
+          sha = json.loads(get(f"https://huggingface.co/api/models/{repo}"))["sha"]
+          import onnxruntime as ort
+          from tokenizers import Tokenizer
+          for name in ["tokenizer.json", "onnx/model.onnx", "onnx/model_quantized.onnx"]:
+              data = get(f"https://huggingface.co/{repo}/resolve/{sha}/{name}")
+              open(name.replace("/", "_"), "wb").write(data)
+              print(f"::notice title={repo}/{name}::rev={sha} sha256={hashlib.sha256(data).hexdigest()} bytes={len(data)}")
+          tok = Tokenizer.from_file("tokenizer.json")
+          tok.enable_truncation(max_length=512); tok.enable_padding()
+          texts = ["Represent this sentence for searching relevant passages: images must have alternative text",
+                   "H37: Using alt attributes on img elements. The objective of this technique is to provide a text alternative.",
+                   "G18: Ensuring that a contrast ratio of at least 4.5:1 exists between text and background."]
+          for model in ["onnx_model.onnx", "onnx_model_quantized.onnx"]:
+              sess = ort.InferenceSession(model, providers=["CPUExecutionProvider"])
+              names = [i.name for i in sess.get_inputs()]
+              enc = tok.encode_batch(texts)
+              feed = {"input_ids": np.array([e.ids for e in enc], dtype=np.int64),
+                      "attention_mask": np.array([e.attention_mask for e in enc], dtype=np.int64)}
+              if "token_type_ids" in names:
+                  feed["token_type_ids"] = np.array([e.type_ids for e in enc], dtype=np.int64)
+              t = time.time()
+              out = sess.run(None, feed)[0]
+              cls = out[:, 0]; cls = cls / np.linalg.norm(cls, axis=1, keepdims=True)
+              print(f"::notice title={model}::inputs={names} out_shape={out.shape} cos(q,H37)={cls[0]@cls[1]:.3f} cos(q,G18)={cls[0]@cls[2]:.3f} seconds={time.time()-t:.3f}")
