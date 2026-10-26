@@ -1,0 +1,49 @@
+{
+  "method": "agent",
+  "model": "groq:openai/gpt-oss-120b",
+  "dataset": "accessguru",
+  "split": "dev",
+  "complete": false,
+  "items_done": 1,
+  "items_total": 40,
+  "all": {
+    "violations": 1,
+    "score_decrease": 1.0,
+    "resolved": 1,
+    "target_fixed": 1,
+    "introduced_new_violations": 0,
+    "avg_old_score": 4.0,
+    "avg_new_score": 0.0
+  },
+  "element_level": {
+    "violations": 1,
+    "score_decrease": 1.0,
+    "resolved": 1,
+    "target_fixed": 1,
+    "introduced_new_violations": 0,
+    "avg_old_score": 4.0,
+    "avg_new_score": 0.0
+  },
+  "by_category": {
+    "Layout": {
+      "violations": 1,
+      "score_decrease": 1.0,
+      "resolved": 1,
+      "target_fixed": 1,
+      "introduced_new_violations": 0,
+      "avg_old_score": 4.0,
+      "avg_new_score": 0.0
+    }
+  },
+  "status": {
+    "ok": 1
+  },
+  "dropped_content": 0,
+  "calls": 1,
+  "input_tokens": 719,
+  "output_tokens": 174,
+  "model_seconds": 4.1,
+  "paid_cost_usd": 0.0002,
+  "axe_version": "4.12.1",
+  "tokens_per_item": 893
+}

@@ -7,11 +7,13 @@ All items:
 | Method | Model | Items | Score decrease | Element-level only | Resolved | Broke something | Dropped content | Too large | Tokens per item | Paid cost |
 |---|---|---|---|---|---|---|---|---|---|---|
 | accessguru | openai/gpt-oss-120b | 14/40 (partial) | 0.40 | 0.25 | 6/14 | 0 | 3 | 7 | 12647 | $0.05 |
+| agent | openai/gpt-oss-120b | 1/40 (partial) | 1.00 | 1.00 | 1/1 | 0 | 0 | 0 | 893 | $0.00 |
 | zero_shot | openai/gpt-oss-120b | 40/40 | 0.51 | 0.53 | 21/40 | 11 | 5 | 3 | 930 | $0.01 |
 
-Only the 7 items every run could send (the fairest comparison on the free tier):
+Only the 1 items every run could send (the fairest comparison on the free tier):
 
 | Method | Model | Items | Score decrease | Element-level only | Resolved | Broke something | Dropped content | Too large | Tokens per item | Paid cost |
 |---|---|---|---|---|---|---|---|---|---|---|
-| accessguru | openai/gpt-oss-120b | 7/7 | 0.87 | 1.00 | 6/7 | 0 | 3 | 0 | 17725 | $0.03 |
-| zero_shot | openai/gpt-oss-120b | 7/7 | 0.83 | 0.50 | 6/7 | 0 | 3 | 0 | 432 | $0.00 |
+| accessguru | openai/gpt-oss-120b | 1/1 | 1.00 | 1.00 | 1/1 | 0 | 0 | 0 | 12643 | $0.00 |
+| agent | openai/gpt-oss-120b | 1/1 | 1.00 | 1.00 | 1/1 | 0 | 0 | 0 | 893 | $0.00 |
+| zero_shot | openai/gpt-oss-120b | 1/1 | 0.00 | 0.00 | 0/1 | 0 | 0 | 0 | 415 | $0.00 |
