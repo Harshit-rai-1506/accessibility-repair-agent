@@ -1,7 +1,8 @@
 # Run an evaluation on GitHub's machines instead of your laptop.
 #
 # One-time setup: repository Settings -> Secrets and variables -> Actions ->
-# New repository secret, name GROQ_API_KEY, value your Groq key. Secrets are
+# New repository secret, named GROQ_API_KEY (for groq:... models) or
+# MISTRAL_API_KEY (for mistralai:... models), value your key. Secrets are
 # encrypted, hidden in logs, and never shown to people viewing the repository.
 #
 # Then: Actions tab -> "evaluate" -> Run workflow, pick the method and split.
@@ -31,7 +32,7 @@ on:
         options: [accessguru, access]
         default: accessguru
       model:
-        description: provider:model
+        description: provider:model (e.g. groq:openai/gpt-oss-120b or mistralai:mistral-small-2603)
         default: groq:openai/gpt-oss-120b
       limit:
         description: Only the first N items (empty = all)
@@ -50,6 +51,7 @@ jobs:
     timeout-minutes: 300
     env:
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
       # Inputs go through environment variables, never pasted into scripts.
       METHOD: ${{ inputs.method }}
       SPLIT: ${{ inputs.split }}
@@ -63,8 +65,12 @@ jobs:
         if: inputs.method != 'noop'
         shell: bash
         run: |
-          if [ -z "$GROQ_API_KEY" ]; then
-            echo "::error::Add a repository secret named GROQ_API_KEY first (see the comment at the top of evaluate.yml)."
+          case "$MODEL" in
+            mistral*) name=MISTRAL_API_KEY; value="$MISTRAL_API_KEY" ;;
+            *)        name=GROQ_API_KEY;    value="$GROQ_API_KEY" ;;
+          esac
+          if [ -z "$value" ]; then
+            echo "::error::Add a repository secret named $name first (see the comment at the top of evaluate.yml)."
             exit 1
           fi
 

@@ -1,8 +1,14 @@
 """One place to create the chat model, whichever provider is configured.
 
 The rest of the code asks for "the model" and never imports a provider SDK
-directly. Switching from Groq to a local Ollama model, or to a paid API later,
-is then a one-line change in .env.
+directly. Switching provider is a one-line change in .env (MODEL=...):
+
+    groq:openai/gpt-oss-120b       OpenAI's open-weight gpt-oss on Groq (GROQ_API_KEY)
+    mistralai:mistral-small-2603   Mistral Small 4, open weights, on Mistral's API (MISTRAL_API_KEY)
+    ollama:qwen2.5-coder:3b        any model running locally in Ollama (no key)
+
+Each provider needs its LangChain package (langchain-groq, langchain-mistralai,
+langchain-ollama), all installed by ``pip install -e .``.
 
     from a11y_agent.llm import get_chat_model
     llm = get_chat_model()                     # uses MODEL from .env
@@ -17,18 +23,23 @@ import time
 from .config import settings
 
 # Environment variable that holds the API key for each provider.
-KEY_VARS = {"groq": "GROQ_API_KEY", "openai": "OPENAI_API_KEY", "ollama": None}
+KEY_VARS = {"groq": "GROQ_API_KEY", "mistralai": "MISTRAL_API_KEY", "openai": "OPENAI_API_KEY", "ollama": None}
+
+# Short names people type, mapped to LangChain's provider names.
+PROVIDER_ALIASES = {"mistral": "mistralai"}
 
 
 def parse_model_spec(spec: str) -> tuple[str, str]:
     """Split "provider:model" -> (provider, model). Only the first colon counts,
-    so Ollama tags like "ollama:qwen2.5-coder:3b" work."""
+    so Ollama tags like "ollama:qwen2.5-coder:3b" work. "mistral:" means "mistralai:"."""
     provider, sep, model = (spec or "").strip().partition(":")
     if not sep or not provider or not model:
         raise ValueError(
-            f"model spec {spec!r} must look like 'provider:model', e.g. 'groq:openai/gpt-oss-120b'"
+            f"model spec {spec!r} must look like 'provider:model', e.g. 'groq:openai/gpt-oss-120b' "
+            "or 'mistralai:mistral-small-2603'"
         )
-    return provider.lower(), model
+    provider = provider.lower()
+    return PROVIDER_ALIASES.get(provider, provider), model
 
 
 def missing_key(spec: str | None = None) -> str | None:
@@ -51,6 +62,11 @@ def get_chat_model(spec: str | None = None, *, temperature: float = 0.0, **kwarg
         options["max_retries"] = settings.max_retries
         if model.startswith("openai/gpt-oss"):
             options["reasoning_effort"] = settings.reasoning_effort
+    elif provider == "mistralai":
+        # ChatMistralAI retries network errors itself; rate limits (429) are paced and
+        # retried by ModelClient. A fixed seed makes replies as repeatable as possible.
+        options["max_retries"] = settings.max_retries
+        options["random_seed"] = 0
     options.update(kwargs)
     return init_chat_model(model, model_provider=provider, **options)
 

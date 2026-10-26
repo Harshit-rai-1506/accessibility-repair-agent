@@ -64,6 +64,7 @@ demos that work on one example.
 |---|---|---|
 | Model | `openai/gpt-oss-120b` on Groq's free tier | Open weights (Apache 2.0), a production model on Groq, no card needed, fast. |
 | Second model | `openai/gpt-oss-20b` on Groq | Separate free daily quota; also lets us test whether a smaller model suffices. |
+| Second provider | Mistral Small 4 (`mistral-small-2603`) on Mistral's API | Open weights (Apache 2.0), same price as gpt-oss-120b, a free tier without Groq's 8,000-token request limit, so full dev runs fit in one sitting. |
 | Offline option | Any Ollama model, e.g. `qwen2.5-coder:3b` | Works without internet, but slow on a laptop CPU, so not the default. |
 | Ground truth | axe-core **4.12.1**, pinned and checksum-verified | The industry-standard rule engine; pinning keeps results reproducible. |
 | Rules checked | WCAG 2.0/2.1/2.2 A, AA, AAA + best practice | Matches the benchmark, which includes AAA contrast and best-practice rules. |

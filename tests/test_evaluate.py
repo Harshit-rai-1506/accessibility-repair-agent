@@ -199,3 +199,22 @@ def test_bad_key_stops_the_run(tmp_path):
     error.status_code = 401
     s = run("zero_shot", ITEMS, tmp_path, llm=ScriptedModel(raise_error=error))
     assert "API key" in s["stopped"] and s["items_done"] == 0
+
+
+def test_report_compares_methods_only_within_a_model():
+    from a11y_agent.evaluate import report_by_model, summarize_rows
+
+    def run_of(method, model, new_score):
+        row = {"id": "t-1", "rule_id": "image-alt", "category": "Syntax", "page_level": False, "status": "ok",
+               "old_score": 5, "new_score": new_score, "target_fixed": new_score == 0, "resolved": new_score == 0,
+               "introduced": [], "dropped_content": False, "calls": 1, "cached_calls": 0, "input_tokens": 10,
+               "output_tokens": 5, "model_seconds": 0.1}
+        rows = [row]
+        return summarize_rows(rows, method=method, model=model, dataset="t", split="dev", total_items=1), rows
+
+    runs = [run_of("noop", None, 5), run_of("zero_shot", "groq:openai/gpt-oss-120b", 5),
+            run_of("agent", "groq:openai/gpt-oss-120b", 0), run_of("agent", "mistralai:mistral-small-2603", 0)]
+    text = report_by_model(runs)
+    groq, mistral = text.split("### mistral-small-2603")
+    assert "### openai/gpt-oss-120b (groq)" in groq and "| zero_shot |" in groq and "| noop |" in groq
+    assert "| zero_shot |" not in mistral and "| agent |" in mistral and "| noop |" in mistral

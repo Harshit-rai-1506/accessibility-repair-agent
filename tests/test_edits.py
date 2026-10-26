@@ -45,7 +45,8 @@ def test_schema_is_strict():
     schema = fmt["json_schema"]["schema"]
     assert schema["additionalProperties"] is False
     assert set(schema["required"]) == {"explanation", "edits"}
-    edit = schema["$defs"]["Edit"]
+    assert "$defs" not in json.dumps(schema) and "$ref" not in json.dumps(schema)   # written out in place
+    edit = schema["properties"]["edits"]["items"]
     assert edit["additionalProperties"] is False and set(edit["required"]) == {"find", "replace"}
 
 

@@ -23,6 +23,7 @@ dependencies = [
     "langgraph>=1.2,<2",
     "langgraph-checkpoint-sqlite>=3.0,<4",   # saved checkpoints: resume a stopped run
     "langchain-groq>=1.1,<2",      # free hosted open-weight models (default)
+    "langchain-mistralai>=1.1,<2", # Mistral's API (open-weight Mistral Small 4 and others)
     "langchain-ollama>=1.1,<2",    # optional fully-local models
     # Phase 3: Model Context Protocol (our own tool server + client adapter)
     "mcp>=1.24,<2",

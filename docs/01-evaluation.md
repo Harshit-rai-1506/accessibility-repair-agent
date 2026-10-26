@@ -144,12 +144,13 @@ and 200,000 tokens per day**. `model_client.py` is built around those limits:
   the same answers, so you can change the report or fix a scoring bug without
   spending quota. The report counts cost only for replies that were not cached.
 - **Pacing.** Before each call, a rate limiter checks the last 60 seconds of
-  token and request use and waits if the call would not fit
-  (`RATE_LIMIT_TPM=7000`, `RATE_LIMIT_RPM=25` in `.env`, a little under the
-  limits). Hitting a limit anyway is handled with waits and retries.
-- **Requests that can never fit.** One request may not exceed the per-minute
-  limit. Anything planned above `MAX_REQUEST_TOKENS=8000` (prompt plus room for
-  the answer) is not sent; the item is marked `too_large`.
+  token and request use and waits if the call would not fit (for Groq: 7,000
+  tokens and 25 requests per minute, a little under the limits; each provider's
+  pacing is in `PROVIDER_LIMITS` in `config.py`). Hitting a limit anyway is
+  handled with waits and retries.
+- **Requests that can never fit.** On Groq's free tier one request may not
+  exceed the per-minute limit. Anything planned above 8,000 tokens (prompt
+  plus room for the answer) is not sent; the item is marked `too_large`.
 - **Stopping cleanly.** When the daily quota runs out, or the key is rejected,
   the run stops and says so. Finished items are already saved; running the same
   command again later skips them and continues. Items that failed for a
@@ -219,8 +220,15 @@ result worth reporting: does the extra cost buy a better score?
 Practical plan: run zero-shot on dev today; run AccessGuru on dev over two days
 (the run stops at the daily limit; start it again the next day). For the final
 test-set runs, either spread them out, or add a few dollars of credit to Groq
-and set `RATE_LIMIT_TPM=0`, `RATE_LIMIT_RPM=0`, `MAX_REQUEST_TOKENS=60000`
-(then nothing is `too_large` either).
+and set `GROQ_RATE_LIMIT_TPM=0`, `GROQ_RATE_LIMIT_RPM=0`,
+`GROQ_MAX_REQUEST_TOKENS=60000` (then nothing is `too_large` either).
+
+**A second provider.** Mistral's API (added later; `MODEL=mistralai:mistral-small-2603`,
+the open-weight Mistral Small 4) allows 1 request per second and 500,000
+tokens per minute on its free tier, with no small per-request limit, so every
+method can run on the whole dev set in one sitting and nothing is
+`too_large`. Results are reported per model: methods are only compared with
+each other on the same model.
 
 ---
 

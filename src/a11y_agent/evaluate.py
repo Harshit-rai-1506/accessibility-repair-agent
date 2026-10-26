@@ -23,7 +23,8 @@ Commands (from the repository root):
     python -m a11y_agent.evaluate run --method zero_shot --limit 5      # try 5 items
     python -m a11y_agent.evaluate run --method zero_shot                # whole dev split
     python -m a11y_agent.evaluate run --method accessguru --model groq:openai/gpt-oss-20b
-    python -m a11y_agent.evaluate report                                # compare all runs
+    python -m a11y_agent.evaluate run --method agent --model mistralai:mistral-small-2603
+    python -m a11y_agent.evaluate report                                # compare all runs, per model
     python -m a11y_agent.evaluate report --save                         # also copy summaries to results/
 """
 
@@ -50,11 +51,13 @@ from .scoring import FixOutcome, evaluate_fix, summarize
 
 RESULTS_DIR = ROOT / "results"
 
-# Paid prices per million tokens (input, output) on Groq, October 2026.
+# Paid prices per million tokens (input, output), October 2026.
 # Used only to report what a run would cost on a paid plan.
 PRICES = {
     "groq:openai/gpt-oss-120b": (0.15, 0.60),
     "groq:openai/gpt-oss-20b": (0.075, 0.30),
+    "mistralai:mistral-small-2603": (0.15, 0.60),      # Mistral Small 4
+    "mistralai:mistral-small-latest": (0.15, 0.60),
 }
 
 
@@ -293,6 +296,27 @@ def common_subset(runs: list[tuple[dict, list[dict]]]) -> tuple[set[str], list[d
     return common, summaries
 
 
+def report_by_model(runs: list[tuple[dict, list[dict]]]) -> str:
+    """One section per model: methods are only compared on the same model.
+
+    The model-free ``noop`` run appears in every section as the floor.
+    """
+    models = sorted({s["model"] for s, _ in runs if s["model"]})
+    floor = [r for r in runs if not r[0]["model"]]
+    sections = []
+    for model in models or [None]:
+        group = floor + [r for r in runs if r[0]["model"] == model] if model else floor
+        summaries = [s for s, _ in group]
+        text = (f"### {model.split(':', 1)[-1]} ({model.split(':', 1)[0]})\n\n" if model else "") + \
+            "All items:\n\n" + report_table(summaries)
+        if any(s["status"].get("too_large") for s in summaries):
+            common, common_summaries = common_subset(group)
+            text += (f"\n\nOnly the {len(common)} items every run could send "
+                     "(the fairest comparison when some requests were too large):\n\n" + report_table(common_summaries))
+        sections.append(text)
+    return "\n\n".join(sections)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate repair methods on the benchmark.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -310,6 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     rep.add_argument("--dataset", default="accessguru", choices=["accessguru", "access"])
     rep.add_argument("--split", default="dev", choices=["dev", "test"])
     rep.add_argument("--save", action="store_true", help="copy summaries to results/ (to commit)")
+    rep.add_argument("--model", help="only runs with this provider:model")
 
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
@@ -333,18 +358,14 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
-    runs = collect_runs(args.dataset, args.split)
+    all_runs = collect_runs(args.dataset, args.split)
+    runs = [r for r in all_runs if r[0]["model"] in (args.model, None)] if args.model else all_runs
     if not runs:
         print(f"No runs found in {settings.runs_dir / f'{args.dataset}-{args.split}'}")
         return 1
-    summaries = [s for s, _ in runs]
-    table = "All items:\n\n" + report_table(summaries)
-    common, common_summaries = common_subset(runs)
-    if any(s["status"].get("too_large") for s in summaries):
-        table += (f"\n\nOnly the {len(common)} items every run could send "
-                  "(the fairest comparison on the free tier):\n\n" + report_table(common_summaries))
-    print(table)
-    if args.save:
+    print(report_by_model(runs))
+    if args.save:                                  # results/ always gets every model
+        summaries, table = [s for s, _ in all_runs], report_by_model(all_runs)
         target = RESULTS_DIR / f"{args.dataset}-{args.split}"
         target.mkdir(parents=True, exist_ok=True)
         for s in summaries:

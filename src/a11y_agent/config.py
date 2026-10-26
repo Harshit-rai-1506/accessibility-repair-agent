@@ -24,6 +24,28 @@ def _env(name: str, default: str) -> str:
 
 
 @dataclass(frozen=True)
+class Limits:
+    """How fast and how big requests to one provider may be (0 = no limit)."""
+    tokens_per_minute: int
+    requests_per_minute: int
+    max_request_tokens: int      # one request (prompt + reply budget) larger than this is skipped as "too_large"
+    max_output_tokens: int       # largest reply budget the baselines ask for
+    min_interval: float = 0.0    # seconds between requests (Mistral's free tier: 1 request per second)
+
+
+# Pacing per provider, a little below each free tier, so runs rarely hit a limit.
+#   Groq free tier, gpt-oss: 30 requests and 8,000 tokens per minute; 8,000 tokens per request.
+#   Mistral free tier: 1 request per second, 500,000 tokens per minute, 1 billion tokens per month.
+PROVIDER_LIMITS = {
+    "groq": Limits(7000, 25, 8000, 6000),
+    "mistralai": Limits(450_000, 50, 120_000, 16_000, min_interval=1.1),
+}
+NO_LIMITS = Limits(0, 0, 0, 16_000)
+# Prefix of the environment variables that override a provider's limits, e.g. MISTRAL_RATE_LIMIT_RPM.
+ENV_PREFIX = {"groq": "GROQ", "mistralai": "MISTRAL", "openai": "OPENAI", "ollama": "OLLAMA"}
+
+
+@dataclass(frozen=True)
 class Settings:
     # "provider:model" strings, e.g. "groq:openai/gpt-oss-120b"
     model: str = field(default_factory=lambda: _env("MODEL", "groq:openai/gpt-oss-120b"))
@@ -31,13 +53,32 @@ class Settings:
     reasoning_effort: str = field(default_factory=lambda: _env("REASONING_EFFORT", "low"))
     max_retries: int = field(default_factory=lambda: int(_env("MAX_RETRIES", "5")))
 
-    # Free-tier limits for gpt-oss on Groq are 30 requests and 8,000 tokens per
-    # minute; we stay a little below. Set both to 0 on a paid plan.
-    rate_limit_tpm: int = field(default_factory=lambda: int(_env("RATE_LIMIT_TPM", "7000")))
-    rate_limit_rpm: int = field(default_factory=lambda: int(_env("RATE_LIMIT_RPM", "25")))
-    # A single request larger than this is skipped (counted as "too_large").
-    max_request_tokens: int = field(default_factory=lambda: int(_env("MAX_REQUEST_TOKENS", "8000")))
-    max_output_tokens: int = field(default_factory=lambda: int(_env("MAX_OUTPUT_TOKENS", "6000")))
+    def limits(self, spec: str | None = None) -> Limits:
+        """Rate and size limits for the provider of ``spec`` ("provider:model").
+
+        Built-in defaults (PROVIDER_LIMITS) can be overridden per provider, e.g.
+        ``MISTRAL_RATE_LIMIT_RPM=0`` or ``GROQ_MAX_REQUEST_TOKENS=60000`` on a paid
+        plan. The older names without a prefix (RATE_LIMIT_TPM, RATE_LIMIT_RPM,
+        MAX_REQUEST_TOKENS, MAX_OUTPUT_TOKENS) still work and apply to Groq.
+        """
+        provider = (spec or self.model).split(":", 1)[0].strip().lower()
+        provider = {"mistral": "mistralai"}.get(provider, provider)
+        base = PROVIDER_LIMITS.get(provider, NO_LIMITS)
+        prefix = ENV_PREFIX.get(provider, provider.upper())
+
+        def pick(name: str, default) -> int:
+            value = os.getenv(f"{prefix}_{name}", "").strip()
+            if not value and provider == "groq":
+                value = os.getenv(name, "").strip()       # the original, unprefixed names
+            return type(default)(value) if value else default
+
+        return Limits(
+            tokens_per_minute=pick("RATE_LIMIT_TPM", base.tokens_per_minute),
+            requests_per_minute=pick("RATE_LIMIT_RPM", base.requests_per_minute),
+            max_request_tokens=pick("MAX_REQUEST_TOKENS", base.max_request_tokens),
+            max_output_tokens=pick("MAX_OUTPUT_TOKENS", base.max_output_tokens),
+            min_interval=float(os.getenv(f"{prefix}_MIN_INTERVAL", "").strip() or base.min_interval),
+        )
 
     # axe-core is the rule engine that decides what counts as a violation.
     axe_version: str = field(default_factory=lambda: _env("AXE_VERSION", "4.12.1"))

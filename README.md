@@ -35,7 +35,8 @@ it is structured, and verify every fix by scanning again.
 - *Side effects:* fixes that break another rule, and fixes that "work" by
   deleting content, are counted separately.
 - *Second metric:* how often the guardrails reject a proposed fix, and why.
-- *Constraint:* free open-weight models (OpenAI gpt-oss on Groq's free tier).
+- *Constraint:* free open-weight models: OpenAI's gpt-oss-120b on Groq, and
+  Mistral Small 4 on Mistral's API. Methods are compared on the same model.
 
 ## Results so far (dev set, 40 items, gpt-oss-120b on Groq's free tier)
 
@@ -96,11 +97,12 @@ python -m playwright install chromium       # headless browser (~150 MB)
 python scripts/fetch_resources.py           # benchmark, axe-core, WCAG docs (~30 MB)
 
 cp .env.example .env                        # Windows: copy .env.example .env
-# paste a free Groq key (https://console.groq.com/keys) into .env
+# paste a free Groq key (https://console.groq.com/keys) into .env,
+# or use Mistral: MODEL=mistralai:mistral-small-2603 and MISTRAL_API_KEY
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 139 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 148 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```

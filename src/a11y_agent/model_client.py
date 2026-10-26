@@ -1,9 +1,10 @@
 """Calling the model for evaluations: cached, rate-limited, and honest about limits.
 
-Evaluation runs make hundreds of model calls on a free tier with tight
-limits (for gpt-oss-120b on Groq: 30 requests and 8,000 tokens per minute,
-200,000 tokens per day). ``ModelClient`` wraps the LangChain chat model with
-three things a plain ``llm.invoke()`` does not give you:
+Evaluation runs make hundreds of model calls on free tiers with tight
+limits (gpt-oss-120b on Groq: 30 requests and 8,000 tokens per minute,
+200,000 tokens per day; Mistral: 1 request per second). ``ModelClient`` wraps
+the LangChain chat model with three things a plain ``llm.invoke()`` does not
+give you (the limits for each provider are in ``config.PROVIDER_LIMITS``):
 
 * **A response cache on disk.** Each request (model, settings, messages) is
   hashed; the reply is stored in an SQLite file. Running the same evaluation
@@ -171,11 +172,14 @@ class RateLimiter:
     real token count once the reply arrives.
     """
 
-    def __init__(self, tokens_per_minute: int = 0, requests_per_minute: int = 0, window: float = 60.0):
+    def __init__(self, tokens_per_minute: int = 0, requests_per_minute: int = 0, window: float = 60.0,
+                 min_interval: float = 0.0):
         self.tpm = tokens_per_minute
         self.rpm = requests_per_minute
         self.window = window
+        self.min_interval = min_interval        # seconds between requests (e.g. 1 request per second)
         self._events: deque[list] = deque()    # [timestamp, tokens]
+        self._last = float("-inf")
         self._lock = asyncio.Lock()
 
     def _expire(self, now: float) -> None:
@@ -190,11 +194,16 @@ class RateLimiter:
                 used = sum(e[1] for e in self._events)
                 tokens_ok = not self.tpm or used + tokens <= self.tpm or not self._events
                 requests_ok = not self.rpm or len(self._events) < self.rpm
-                if tokens_ok and requests_ok:
+                gap = self.min_interval - (now - self._last)
+                if tokens_ok and requests_ok and gap <= 0:
                     event = [now, tokens]
                     self._events.append(event)
+                    self._last = now
                     return event
-                await asyncio.sleep(max(0.05, self.window - (now - self._events[0][0])))
+                if tokens_ok and requests_ok:
+                    await asyncio.sleep(gap)
+                else:
+                    await asyncio.sleep(max(0.05, self.window - (now - self._events[0][0])))
 
     def settle(self, event: list, actual_tokens: int) -> None:
         event[1] = actual_tokens
@@ -219,18 +228,18 @@ def _error_kind(error: Exception) -> tuple[str, float | None]:
         wait = h * 3600 + mi * 60 + s
     if status in (401, 403) or "invalid api key" in text or "invalid_api_key" in text:
         return "auth", wait
-    if (status == 413 or "request too large" in text or "context_length" in text
+    if (status == 413 or "request too large" in text or "context_length" in text or "context length" in text
             or "maximum context" in text or "reduce the length" in text):
         return "too_large", wait
     if ("json_validate_failed" in text or "does not match the expected schema" in text
             or "tool_use_failed" in text or "failed to call a function" in text):
         return "bad_output", wait
-    if status == 400 and ("response_format" in text or "json_schema" in text):
+    if status in (400, 422) and ("response_format" in text or "json_schema" in text):
         return "format_unsupported", wait
-    if status == 400 and "tool_choice" in text:
+    if status in (400, 422) and "tool_choice" in text:
         return "tool_choice_unsupported", wait
     if status == 429 or "rate limit" in text or "rate_limit" in text:
-        if "per day" in text or "(tpd)" in text or "(rpd)" in text:
+        if "per day" in text or "(tpd)" in text or "(rpd)" in text or "month" in text or "quota" in text:
             return "daily", wait
         return "minute", wait
     return "other", wait
@@ -250,12 +259,19 @@ class ModelClient:
                  limiter: RateLimiter | None = None, max_request_tokens: int | None = None,
                  minute_retries: int = 3):
         self.spec = spec or settings.model
+        self.provider = self.spec.split(":", 1)[0].lower()
         self._llm = llm
         self.cache = cache
-        self.limiter = limiter or RateLimiter(settings.rate_limit_tpm, settings.rate_limit_rpm)
-        self.max_request_tokens = settings.max_request_tokens if max_request_tokens is None else max_request_tokens
+        limits = settings.limits(self.spec)
+        self.limiter = limiter or RateLimiter(limits.tokens_per_minute, limits.requests_per_minute,
+                                              min_interval=limits.min_interval)
+        self.max_request_tokens = limits.max_request_tokens if max_request_tokens is None else max_request_tokens
+        self.max_output_tokens = limits.max_output_tokens
         self.minute_retries = minute_retries
-        self.params = {"temperature": 0.0, "reasoning_effort": settings.reasoning_effort}
+        # Part of every cache key. reasoning_effort only applies to gpt-oss models.
+        self.params = {"temperature": 0.0}
+        if "gpt-oss" in self.spec:
+            self.params["reasoning_effort"] = settings.reasoning_effort
         self.native_schema = True       # set to False if the provider rejects response_format
         self.forced_tool_choice = True  # set to False if the provider rejects tool_choice="required"
 
@@ -268,7 +284,7 @@ class ModelClient:
     def output_budget(self, html: str) -> int:
         """max_tokens for a reply that must contain a corrected copy of ``html``,
         plus room for the model's reasoning."""
-        return min(settings.max_output_tokens, 2 * estimate_tokens(html) + 1024)
+        return min(self.max_output_tokens, 2 * estimate_tokens(html) + 1024)
 
     def _structured_kwargs(self, response_format: dict) -> dict:
         """How each provider is asked for JSON that matches a schema."""
@@ -385,6 +401,8 @@ class ModelClient:
         self._check_size(estimate + max_tokens)
 
         choice = tool_choice if self.forced_tool_choice or tool_choice in (None, "auto") else "auto"
+        if choice == "required" and self.provider in ("mistralai", "mistral"):
+            choice = "any"                        # Mistral's name for "must call a tool"
 
         def softer_choice(kind: str):
             # The provider refuses to force a tool call: let the model choose instead.

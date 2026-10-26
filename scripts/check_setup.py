@@ -26,6 +26,7 @@ PACKAGES = [
     ("langgraph.checkpoint.sqlite", "saved agent checkpoints"),
     ("markdownify", "HTML to Markdown"),
     ("langchain_groq", "Groq models"),
+    ("langchain_mistralai", "Mistral models"),
     ("langchain_ollama", "local models (optional)"),
     ("mcp", "Model Context Protocol"),
     ("langchain_mcp_adapters", "MCP tools in LangChain"),
@@ -195,15 +196,22 @@ def check_model_config() -> str | None:
         from a11y_agent.llm import missing_key, parse_model_spec
         parse_model_spec(settings.model)
     except Exception as e:
-        report("Model config", "FAIL", str(e), "set MODEL in .env, e.g. groq:openai/gpt-oss-120b")
+        report("Model config", "FAIL", str(e),
+               "set MODEL in .env, e.g. groq:openai/gpt-oss-120b or mistralai:mistral-small-2603")
         return None
     env_note = "" if (root / ".env").exists() else " (no .env file; using defaults)"
     key = missing_key()
     if key:
+        where = {"GROQ_API_KEY": "https://console.groq.com/keys",
+                 "MISTRAL_API_KEY": "https://console.mistral.ai/api-keys"}.get(key, "the provider's console")
         report("Model config", "FAIL", f"MODEL={settings.model}, but {key} is not set{env_note}",
-               "copy .env.example to .env and paste your key (free at https://console.groq.com/keys)")
+               f"copy .env.example to .env and paste your key (free at {where})")
         return None
-    report("Model config", "OK", f"MODEL={settings.model}{env_note}")
+    lim = settings.limits()
+    pace = ", ".join(f"{v:,} {unit}" for v, unit in [(lim.requests_per_minute, "requests/min"),
+                                                      (lim.tokens_per_minute, "tokens/min"),
+                                                      (lim.max_request_tokens, "tokens/request")] if v) or "no limits"
+    report("Model config", "OK", f"MODEL={settings.model}{env_note}; pacing: {pace}")
     return settings.model
 
 

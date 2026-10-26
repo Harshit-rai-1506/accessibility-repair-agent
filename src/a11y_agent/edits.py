@@ -52,11 +52,27 @@ class FixProposal(BaseModel):
     edits: list[Edit] = Field(description="The changes, applied in order.")
 
 
+def proposal_schema() -> dict:
+    """FixProposal's JSON schema with nested definitions written out in place.
+
+    Pydantic puts ``Edit`` under ``$defs`` and refers to it with ``$ref``.
+    Not every provider follows references in structured-output schemas, so the
+    schema sent to models has none.
+    """
+    from langchain_core.utils.json_schema import dereference_refs
+
+    schema = dereference_refs(FixProposal.model_json_schema())
+    schema.pop("$defs", None)
+    return schema
+
+
 def proposal_format() -> dict:
-    """OpenAI-style ``response_format`` asking for a ``FixProposal`` (strict schema)."""
+    """OpenAI-style ``response_format`` asking for a ``FixProposal`` (strict schema).
+
+    Groq (gpt-oss) and Mistral both accept this form."""
     return {
         "type": "json_schema",
-        "json_schema": {"name": "fix_proposal", "strict": True, "schema": FixProposal.model_json_schema()},
+        "json_schema": {"name": "fix_proposal", "strict": True, "schema": proposal_schema()},
     }
 
 

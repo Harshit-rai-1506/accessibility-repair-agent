@@ -253,14 +253,25 @@ cp .env.example .env      # Windows: copy .env.example .env
 ```
 
 Then paste a free key from https://console.groq.com/keys into `.env`.
+(Mistral works too: set `MODEL=mistralai:mistral-small-2603` and
+`MISTRAL_API_KEY` from https://console.mistral.ai/api-keys; see the table
+below.)
 
 - **Which model.** `openai/gpt-oss-120b`: an open-weight model (Apache 2.0
   licence) that OpenAI released, hosted for free by Groq. "Open-weight" means
   anyone can download and run it; Groq simply runs it fast for us.
 - **`provider:model` strings.** `MODEL=groq:openai/gpt-oss-120b` in `.env`. The
   part before the first colon picks the provider; LangChain's
-  `init_chat_model` builds the right client. Switching to a fully local model
-  is one line: `MODEL=ollama:qwen2.5-coder:3b`.
+  `init_chat_model` builds the right client. Switching provider is one line:
+
+  | MODEL | What it is | Key | Free tier |
+  |---|---|---|---|
+  | `groq:openai/gpt-oss-120b` | OpenAI's open-weight gpt-oss (120B) on Groq | `GROQ_API_KEY` | 30 requests and 8,000 tokens per minute, 200,000 tokens per day |
+  | `mistralai:mistral-small-2603` | Mistral Small 4 (119B, open weights, Apache 2.0) on Mistral's API | `MISTRAL_API_KEY` | 1 request per second, 500,000 tokens per minute |
+  | `ollama:qwen2.5-coder:3b` | any model running locally in Ollama | none | your laptop's speed |
+
+  Each provider gets its own pacing (`PROVIDER_LIMITS` in `config.py`), and
+  `llm.py` is the only file that knows provider details.
 - **Free-tier limits shape the design.** 30 requests and 8,000 tokens per
   minute, 200,000 tokens per day, per model. So: `reasoning_effort=low`
   (gpt-oss thinks before answering, and thinking costs tokens), automatic
@@ -294,11 +305,12 @@ command that fixes it. A healthy run looks like:
 
 ```
 Python               OK    3.12.x
-Packages             OK    15/15 importable
+Packages             OK    16/16 importable
 Resources            OK    axe-core 4.12.1, benchmark 7 files, WCAG corpus 625 files, axe rules 107 files
 Documents            OK    benchmark 305 + 171 rows, WCAG 581 pages, axe 105 rules
 Browser + scanner    OK    broken example: 12 rules violated (score 44); fixed example: 0
-Model config         OK    MODEL=groq:openai/gpt-oss-120b
+MCP server           OK    5 tools over stdio: scan_html, scan_url, verify_fix, explain_rule, contrast_fix
+Model config         OK    MODEL=groq:openai/gpt-oss-120b; pacing: 25 requests/min, 7,000 tokens/min, 8,000 tokens/request
 Model call           OK    replied "ready" in 0.6 s
 Agent reply          OK    usable JSON edits (schema enforced by the provider): <img src="logo.png" alt="...">
 ```
