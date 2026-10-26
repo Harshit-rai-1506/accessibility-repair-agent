@@ -71,7 +71,8 @@ demos that work on one example.
 | Benchmark | AccessGuru (ASSETS 2025), plus ACCESS (Huang et al. 2024) | Real violations from real sites, a published metric and published baselines. |
 | Framework | LangGraph | Explicit state, loops with limits, checkpoints, built-in pause for human approval. |
 | Tool protocol | MCP Python SDK 1.x + `langchain-mcp-adapters` 0.3 | The adapter requires `mcp < 2`, so we pin the 1.x line. |
-| Vector store | Chroma (embedded) + BM25 keyword search | Runs locally on a laptop; metadata filters let us search within one WCAG criterion. |
+| Vector store | LangChain `InMemoryVectorStore` + BM25 keyword search (planned: Chroma) | About 2,000 chunks: an in-memory search takes milliseconds; one line swaps in Chroma or pgvector if the corpus grows. |
+| Embeddings | bge-small-en-v1.5 (MIT), int8 ONNX on the CPU | 34 MB, free, offline after one download; pinned and checksum-verified. |
 | Retrieval corpus | W3C WCAG 2.2 Understanding docs, success criteria and Techniques | The authoritative source, licensed for reuse with attribution. |
 
 ---
@@ -265,21 +266,30 @@ model, tool-server security.
 (plumbing: ✅ identical results in tests); `agent_tools` measured on dev.
 *Remaining:* the dev runs of `agent` and `agent_tools`.
 
-### Phase 4: Retrieval over WCAG (about 4 hours)
+### Phase 4: Retrieval over WCAG ✅ built
 
-**Build**
-- Start from the `WCAGLoader` and `AxeRuleLoader` Documents (already Markdown,
-  with success criterion, document type, technique ID, title and URL in the
-  metadata); chunk by heading with `MarkdownHeaderTextSplitter` (roughly
-  300–500 tokens per chunk).
-- Map each axe rule to its success criteria from the rule's tags.
-- Index in Chroma (local CPU embeddings) and BM25; merge with reciprocal rank
-  fusion; filter to the violated rule's criteria.
-- Evaluate retrieval on its own (hit@3, MRR) before plugging it in.
+**Built**
+- `retrieval.py`: the Phase 0 Documents (581 WCAG pages, 105 axe rules) cut
+  into 2,357 chunks: split at headings, short sections merged, long ones cut
+  (about 1,200 characters, 150 overlap), link lists dropped, every chunk
+  prefixed with its page title and section.
+- Two indexes: BM25 keywords and dense vectors (`embeddings.py`: bge-small
+  on the CPU, cached in SQLite), fused with reciprocal rank fusion; filters
+  by success criterion (from each axe rule's tags) and page type; a
+  LangChain retriever.
+- Retrieval measured on its own: one query per axe rule with a criterion
+  (75), hit@1/3/10 and MRR@10 per search mode, in CI with the real model
+  (numbers in [04-retrieval.md](04-retrieval.md#7-measuring-retrieval-on-its-own)).
+- The agent: a `retrieve` node (once per rule) puts three W3C passages in the
+  prompt; MCP tool `search_wcag`; method D `agent_rag` (agent_tools + retrieval).
+- Guide: [docs/04-retrieval.md](04-retrieval.md). 174 tests.
 
-**Concepts:** chunking, embeddings, vector databases, metadata filtering,
-hybrid search, retrieval evaluation, context budgets.
-**Done when:** retrieval scores are reported and method D is measured.
+**Concepts:** chunking, embeddings, vector stores (and when not to use a
+database), metadata filtering, hybrid search, retrieval evaluation, context
+budgets, RAG as a graph node and as a tool.
+**Done when:** retrieval scores are reported (✅ in CI) and method D is
+measured. *Remaining:* the dev runs (`agent`, `agent_tools` with the
+round-2 fixes, and `agent_rag`).
 
 ### Phase 5: Guardrails and human approval (about 3–4 hours)
 

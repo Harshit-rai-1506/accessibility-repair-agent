@@ -5,11 +5,10 @@ and **proves each fix worked by re-scanning the page**. Built with LangGraph,
 an MCP tool server, retrieval over the official WCAG documentation, and
 guardrails. Runs on free, open-weight models.
 
-> **Status:** Phases 0–3 are built and tested on Linux and Windows: setup,
-> evaluation harness and baselines, the LangGraph agent, and an MCP tool
-> server the agent uses as a client. Baseline numbers on the dev set are in;
-> the agent's dev-set runs are next (1 of 40 items done before the free daily
-> quota ran out). See the [build plan](docs/PLAN.md).
+> **Status:** Phases 0–4 are built and tested on Linux and Windows: setup,
+> evaluation harness and baselines, the LangGraph agent, an MCP tool server
+> the agent uses as a client, and retrieval over the WCAG documents. Dev-set
+> results below; the Phase 4 dev run is next. See the [build plan](docs/PLAN.md).
 
 ## The problem
 
@@ -84,8 +83,11 @@ edits rather than a rewritten page; every fix is re-scanned and checked for
 deleted content, and failures are fed back for the next attempt. The scanner,
 fix checker, rule explanations and a WCAG contrast calculator are served by an
 MCP server; the agent uses it as a client, and the model can call tools while
-it works ([docs/03-mcp-tools.md](docs/03-mcp-tools.md)). Retrieval, guardrails
-and approval come in Phases 4 and 5.
+it works ([docs/03-mcp-tools.md](docs/03-mcp-tools.md)). Before the first
+attempt on a rule, hybrid search (BM25 + local embeddings) over the W3C's
+WCAG documents puts the relevant techniques and failures in the prompt
+([docs/04-retrieval.md](docs/04-retrieval.md)). Guardrails and human approval
+come in Phase 5.
 
 ## Quickstart
 
@@ -102,7 +104,7 @@ python -m venv .venv
 
 pip install -e ".[dev]"                     # project + all dependencies
 python -m playwright install chromium       # headless browser (~150 MB)
-python scripts/fetch_resources.py           # benchmark, axe-core, WCAG docs (~30 MB)
+python scripts/fetch_resources.py           # benchmark, axe-core, WCAG docs, embedding model (~65 MB)
 
 cp .env.example .env                        # Windows: copy .env.example .env
 # paste a free Groq key (https://console.groq.com/keys) into .env,
@@ -110,7 +112,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 159 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 174 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
@@ -132,6 +134,15 @@ python -m a11y_agent.mcp_server --http --port 8765           # streamable HTTP a
 python -m a11y_agent.agent examples/broken_page.html --tools # the agent as an MCP client, with model tools
 ```
 
+Search the WCAG documents (Phase 4):
+
+```bash
+python -m a11y_agent.retrieval build                         # embed the corpus once (a few minutes on a laptop)
+python -m a11y_agent.retrieval search "icon link has no accessible name" --sc 2.4.4
+python -m a11y_agent.retrieval eval                          # hit@k and MRR: keywords vs embeddings vs hybrid
+python -m a11y_agent.agent examples/broken_page.html --rag   # the agent with W3C guidance in its prompts
+```
+
 Run the evaluation (Phases 1–2):
 
 ```bash
@@ -140,6 +151,7 @@ python -m a11y_agent.evaluate run --method zero_shot         # dev split, ~42K t
 python -m a11y_agent.evaluate run --method accessguru        # dev split, ~350K tokens: spans 2 days of free quota
 python -m a11y_agent.evaluate run --method agent             # dev split, roughly 60-120K tokens
 python -m a11y_agent.evaluate run --method agent_tools       # dev split, roughly 100-180K tokens
+python -m a11y_agent.evaluate run --method agent_rag         # dev split, agent_tools + retrieval
 python -m a11y_agent.evaluate report                         # compare everything run so far
 ```
 
@@ -149,8 +161,9 @@ of your laptop: see [docs/01-evaluation.md](docs/01-evaluation.md#9-running-it).
 
 Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 [docs/01-evaluation.md](docs/01-evaluation.md) (evaluation),
-[docs/02-agent.md](docs/02-agent.md) (the LangGraph agent) and
-[docs/03-mcp-tools.md](docs/03-mcp-tools.md) (MCP tools).
+[docs/02-agent.md](docs/02-agent.md) (the LangGraph agent),
+[docs/03-mcp-tools.md](docs/03-mcp-tools.md) (MCP tools) and
+[docs/04-retrieval.md](docs/04-retrieval.md) (retrieval).
 
 ## Roadmap
 
@@ -160,7 +173,7 @@ Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 | 1 | Fixed dev/test split, evaluation harness, zero-shot and AccessGuru baselines | Evals before agents, caching, rate limits | ✅ Done (dev numbers in) |
 | 2 | LangGraph agent: scan → fix → verify → retry, with state and checkpoints | Graphs, state, reducers, conditional edges, structured output, checkpoints | ✅ Built; dev run pending |
 | 3 | MCP server exposing the scanner, fix checker, rule explanations and a contrast calculator; agent calls them as a client | MCP (tools, resources, prompts, stdio/HTTP), function calling | ✅ Built; dev run pending |
-| 4 | Retrieval over WCAG Understanding docs and Techniques | Chunking, embeddings, hybrid search, metadata filters | Planned |
+| 4 | Retrieval over WCAG Understanding docs and Techniques, as a graph node and an MCP tool | Chunking, embeddings, hybrid search, metadata filters, retrieval evaluation | ✅ Built; dev run pending |
 | 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | Planned |
 | 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, reporting | Planned |
 
@@ -187,6 +200,8 @@ src/a11y_agent/
     contrast.py    WCAG contrast ratio and the closest colours that pass
     mcp_server.py  the MCP server (FastMCP): scan, verify, explain, contrast tools; a resource; a prompt
     mcp_client.py  starts the server and connects: a remote scanner and LangChain tools for the model
+    retrieval.py   chunking, BM25 + dense hybrid search, criteria filters, retrieval evaluation
+    embeddings.py  bge-small embeddings on the CPU (ONNX), cached; a test stand-in
 scripts/
     fetch_resources.py   downloads pinned, checksum-verified resources into data/
     check_setup.py       tells you exactly what is missing
