@@ -216,9 +216,17 @@ dev/test discipline.
 edits, and every dev item fits the free-tier request limit (the largest
 benchmark snippet, about 10,800 tokens, becomes a 4,700-token request).
 
+**Measured on dev (Mistral Small 4, 26 Oct):** agent 0.59 (0 deletions, 2
+broke another rule) against zero-shot 0.61 and AccessGuru 0.75 (0.47 when
+deletions count as failures). Error analysis found five mechanical causes
+(duplicate text, fragments, new content tripping `region`, many failing
+elements, repeated attempts); fixed with `replace_all`, start/end anchors,
+pass conditions in feedback, a scaled reply budget and kept progress
+([02-agent.md §14](02-agent.md#14-error-analysis-round-1)). Re-run pending.
+
 **Concepts:** graphs versus chains, typed state and reducers, conditional
 edges, bounded loops, structured outputs, context budgets, runtime context,
-checkpointing, streaming and tracing, testing with fake models.
+checkpointing, streaming and tracing, testing with fake models, error analysis.
 **Done when:** method C beats method A on the dev set (graph diagram:
 [docs/02-agent.md §3](02-agent.md#3-the-graph)). *Remaining:* the first dev
 run with a real key (`evaluate run --method agent`).

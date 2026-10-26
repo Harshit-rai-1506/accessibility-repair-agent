@@ -38,19 +38,26 @@ it is structured, and verify every fix by scanning again.
 - *Constraint:* free open-weight models: OpenAI's gpt-oss-120b on Groq, and
   Mistral Small 4 on Mistral's API. Methods are compared on the same model.
 
-## Results so far (dev set, 40 items, gpt-oss-120b on Groq's free tier)
+## Results so far (dev set, 40 items, Mistral Small 4)
 
-| Method | Score decrease | Resolved | Broke another rule | Dropped content | Too large to send | Tokens per item |
+Every method run on the same model and the same 40 items:
+
+| Method | Score decrease | Deletions count as failures | Resolved | Broke another rule | Deleted content | Tokens per item |
 |---|---|---|---|---|---|---|
-| Zero-shot prompt | 0.51 | 21/40 | 11 | 5 | 3 | 930 |
-| AccessGuru prompting (14/40 so far) | 0.40 | 6/14 | 0 | 3 | 7 | 12,647 |
-| **Our agent** (Phase 2) | *run in progress (1/40: fixed in 1 call, 893 tokens)* | | | | | |
-| **Our agent with MCP tools** (Phase 3) | *pending* | | | | | |
+| Zero-shot prompt | 0.61 | 0.60 | 23/40 | 7 | 2 | 1,825 |
+| AccessGuru prompting (ASSETS 2025) | 0.75 | **0.47** | 29/40 | 5 | **11** | 25,510 |
+| Our agent (Phase 2) | 0.59 | 0.59 | 23/40 | 2 | 0 | 4,036 |
+| **Our agent with MCP tools** (Phase 3) | **0.67** | **0.67** | 27/40 | **1** | **0** | 9,998 |
 
 Score decrease is 1 − (violation score after ÷ before), from the AccessGuru
-paper: 1.0 means every target fixed with nothing broken. Full tables:
-[results/accessguru-dev](results/accessguru-dev/README.md). The test set is
-held back until the end.
+paper: 1.0 means every target fixed with nothing broken. The metric alone
+rewards deleting the broken element, so the second column scores a fix that
+removed content as no fix: AccessGuru's lead comes from deletions (11 of 40
+items). An error analysis of the agent's failures on these runs led to five
+fixes (see [docs/02-agent.md §14](docs/02-agent.md#14-error-analysis-round-1));
+the agent runs are being repeated with them. Full tables, per-item outcomes
+and the agent's step traces: [results/accessguru-dev](results/accessguru-dev/README.md).
+The test set is held back until the end.
 
 ## How it works
 
@@ -102,7 +109,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 148 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 156 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```

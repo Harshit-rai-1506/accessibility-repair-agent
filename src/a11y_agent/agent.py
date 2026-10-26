@@ -254,7 +254,7 @@ def build_request(state: AgentState, violation: dict, model: ModelClient,
     """
     html, feedback = state["current_html"], state.get("feedback") or []
     tools = bool(tool_specs)
-    low, high = OUTPUT_TOKENS
+    low, high = OUTPUT_TOKENS[0], reply_budget(violation, model)
     limit = int(model.max_request_tokens * BUDGET_MARGIN) if model.max_request_tokens else 0
     shown, excerpted = html, False
     if limit:
@@ -269,13 +269,24 @@ def build_request(state: AgentState, violation: dict, model: ModelClient,
     return messages, max_tokens, excerpted
 
 
+def reply_budget(violation: dict, model: ModelClient) -> int:
+    """Largest reply to allow: enough for one edit per failing element, within the provider's output limit.
+
+    A fixed 3,072 tokens cut off replies that had to fix 55 images (dev item
+    accessguru-175). About 150 tokens per element covers a find, a replace and
+    some reasoning.
+    """
+    wanted = 1024 + 150 * violation.get("node_count", 1)
+    return max(OUTPUT_TOKENS[1], min(model.max_output_tokens, wanted))
+
+
 def _short(text: str, limit: int = 160) -> str:
     text = " ".join(str(text).split())
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-async def ask_with_tools(messages: list[tuple[str, str]], ctx: AgentContext,
-                         tool_specs: list[dict]) -> tuple[FixProposal, list[CallRecord], list[str]]:
+async def ask_with_tools(messages: list[tuple[str, str]], ctx: AgentContext, tool_specs: list[dict],
+                         budget: int = OUTPUT_TOKENS[1]) -> tuple[FixProposal, list[CallRecord], list[str]]:
     """Let the model call tools, then return its ``submit_fix`` proposal.
 
     A small loop inside one attempt: send the conversation; if the model asks
@@ -297,18 +308,18 @@ async def ask_with_tools(messages: list[tuple[str, str]], ctx: AgentContext,
     notes: list[str] = []
     limit = int(ctx.model.max_request_tokens * BUDGET_MARGIN) if ctx.model.max_request_tokens else 0
     try:
-        return await _tool_rounds(conversation, ctx, tools, tool_specs, submit, records, notes, limit)
+        return await _tool_rounds(conversation, ctx, tools, tool_specs, submit, records, notes, limit, budget)
     except (ProposalError, BadReply) as e:
         e.records, e.notes = records, notes                   # keep the cost and trace of a failed attempt
         raise
 
 
 async def _tool_rounds(conversation: list, ctx: AgentContext, tools: dict, tool_specs: list[dict], submit: dict,
-                       records: list[CallRecord], notes: list[str], limit: int):
+                       records: list[CallRecord], notes: list[str], limit: int, budget: int):
     """The rounds of ``ask_with_tools``; ``records`` and ``notes`` are filled in as it goes."""
     from langchain_core.messages import ToolMessage
 
-    low, high = OUTPUT_TOKENS
+    low, high = OUTPUT_TOKENS[0], budget
     for round_number in range(MAX_TOOL_ROUNDS + 1):
         offered, choice = tool_specs + [submit], "required"
         used = lc_messages_tokens(conversation) + tools_tokens(offered)
@@ -364,6 +375,7 @@ async def propose(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
     out_of_tries = attempt >= ctx.max_attempts
 
     def failed(problem: str, edits_text: str = "", usage: list | None = None, detail: str = "") -> dict:
+        problem += repeated(state.get("feedback") or [], edits_text)
         return {"attempt": attempt, "candidate": None, "verdict": "give_up" if out_of_tries else "retry",
                 "usage": usage or [], "feedback": [{"attempt": attempt, "edits": edits_text, "problem": problem}],
                 "steps": _step("propose", detail or problem, rule=rule, attempt=attempt)}
@@ -371,7 +383,8 @@ async def propose(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
     note = " (HTML excerpted)" if excerpted else ""
     try:
         if tool_specs:
-            proposal, records, tool_notes = await ask_with_tools(messages, ctx, tool_specs)
+            proposal, records, tool_notes = await ask_with_tools(messages, ctx, tool_specs,
+                                                                 reply_budget(violation, ctx.model))
         else:
             reply, record = await ctx.model.chat(messages, max_tokens=max_tokens, response_format=proposal_format())
             records, tool_notes = [record], []
@@ -410,6 +423,13 @@ async def propose(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
                            attempt=attempt)}
 
 
+def repeated(feedback: list[dict], edits_text: str) -> str:
+    """A note for the model if it proposed exactly the same edits as an earlier attempt."""
+    same = [f["attempt"] for f in feedback if edits_text and f.get("edits") == edits_text]
+    return (f" This is the same change as attempt {same[0]}, which did not work either: try a different approach."
+            if same else "")
+
+
 async def verify(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
     """Scan the candidate and decide: accept, retry with feedback, or give up.
 
@@ -421,6 +441,13 @@ async def verify(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
     after = await runtime.context.scanner.scan_html(candidate["html"])
     judgement = judge_fix(to_scan_result(state["scan"]), after, rule, state["current_html"], candidate["html"])
 
+    # Progress: fewer elements fail the rule, and nothing else got worse. Keep that
+    # change and let the next attempt continue from it, instead of starting over.
+    before_count = find_violation(state["scan"], rule)["node_count"]
+    remaining = len(after.get(rule).nodes) if after.get(rule) else 0
+    progress = (not judgement.passed and not judgement.target_fixed and remaining < before_count
+                and not judgement.introduced and judgement.content_ok)
+
     if judgement.passed:
         verdict = "accept"
     elif state["attempt"] < runtime.context.max_attempts:
@@ -431,12 +458,20 @@ async def verify(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
               "new_score": judgement.new_score, "target_fixed": judgement.target_fixed,
               "introduced": judgement.introduced, "text_kept": judgement.text_kept,
               "elements_kept": judgement.elements_kept, "content_ok": judgement.content_ok}
+    edits_text = describe_edits(candidate["edits"])
     problem = " ".join(judgement.problems)
-    feedback = [{"attempt": state["attempt"], "edits": describe_edits(candidate["edits"]),
-                 "problem": problem}] if problem else []
-    return {"candidate": result, "candidates": [result], "verdict": verdict, "feedback": feedback,
-            "steps": _step("verify", f"{problem or 'passed'} -> {verdict}", rule=rule, attempt=state["attempt"],
-                           score=f"{judgement.old_score}->{judgement.new_score}")}
+    if progress:
+        problem = (f"Progress: your change fixed {before_count - remaining} of the {before_count} failing elements "
+                   "without breaking anything, so it has been kept (the HTML below includes it). " + problem)
+    elif problem:
+        problem += repeated(state.get("feedback") or [], edits_text)
+    feedback = [{"attempt": state["attempt"], "edits": edits_text, "problem": problem}] if problem else []
+    update = {"candidate": result, "candidates": [result], "verdict": verdict, "feedback": feedback,
+              "steps": _step("verify", f"{problem or 'passed'} -> {verdict}", rule=rule, attempt=state["attempt"],
+                             score=f"{judgement.old_score}->{judgement.new_score}")}
+    if progress:
+        update.update(current_html=candidate["html"], scan=result["scan"])
+    return update
 
 
 async def accept(state: AgentState) -> dict:

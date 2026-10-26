@@ -188,7 +188,7 @@ class AgentMethod:
         kind = outcome.get("status", "not_fixed")
         trace = "\n".join(f"{s['node']}: {s['detail']}" for s in state.get("steps", []))
         status = {"fixed": "ok", "improved": "ok", "too_large": "too_large"}.get(kind, "no_improvement")
-        html = state["current_html"] if kind in ("fixed", "improved") else item.html
+        html = state["current_html"]          # the original, unless a fix (or partial progress) was kept
         return FixResult(html=html, status=status, calls=calls, response=trace,
                          passes=outcome.get("attempts", 0), note=f"{kind} after {outcome.get('attempts', 0)} attempt(s)")
 

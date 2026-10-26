@@ -95,9 +95,11 @@ class RateLimitError(Exception):
 # For the agent: replies are JSON edits
 # ---------------------------------------------------------------------------
 
-def proposal(*edits: tuple[str, str], explanation: str = "Fixed it.") -> dict:
-    """A FixProposal as a dict: proposal(("find", "replace"), ...)."""
-    return {"explanation": explanation, "edits": [{"find": f, "replace": r} for f, r in edits]}
+def proposal(*edits: tuple, explanation: str = "Fixed it.") -> dict:
+    """A FixProposal as a dict: proposal(("find", "replace"), ("find", "replace", True), ...)."""
+    return {"explanation": explanation,
+            "edits": [{"find": e[0], "replace": e[1], "replace_all": bool(e[2]) if len(e) > 2 else False}
+                      for e in edits]}
 
 
 def shown_html(prompt: str) -> str:

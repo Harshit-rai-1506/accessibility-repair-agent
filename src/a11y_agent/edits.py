@@ -36,12 +36,19 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 # The reply format
 # ---------------------------------------------------------------------------
 
+START, END = "<<start>>", "<<end>>"     # special "find" values: insert at the beginning / end of the HTML
+
+
 class Edit(BaseModel):
     """One change: replace the exact text ``find`` with ``replace``."""
     model_config = ConfigDict(extra="forbid")
 
-    find: str = Field(description="Text copied exactly from the HTML, long enough to occur only once.")
+    find: str = Field(description=f"Text copied exactly from the HTML, long enough to occur only once. "
+                                  f'Or "{START}" / "{END}" to insert "replace" at the very beginning / end of the HTML.')
     replace: str = Field(description="What that text becomes.")
+    replace_all: bool = Field(default=False, description="true to change every place where 'find' occurs "
+                                                         "(when the same text appears several times and every "
+                                                         "copy needs the same change); otherwise false.")
 
 
 class FixProposal(BaseModel):
@@ -63,6 +70,11 @@ def proposal_schema() -> dict:
 
     schema = dereference_refs(FixProposal.model_json_schema())
     schema.pop("$defs", None)
+    # Strict schemas need every field listed as required, including replace_all
+    # (which has a default only so that hand-written edits may leave it out).
+    edit = schema["properties"]["edits"]["items"]
+    edit["required"] = list(edit["properties"])
+    edit["properties"]["replace_all"].pop("default", None)
     return schema
 
 
@@ -87,13 +99,12 @@ def submit_tool_spec() -> dict:
     tool, ``submit_fix``, whose arguments are a FixProposal: the model's
     work ends when it calls it, and we validate the arguments with Pydantic.
     """
-    from langchain_core.utils.function_calling import convert_to_openai_tool
-
-    spec = convert_to_openai_tool(FixProposal)
-    spec["function"]["name"] = SUBMIT_TOOL
-    spec["function"]["description"] = ("Submit your fix: a one or two sentence explanation and the edits. "
-                                       "Call this exactly once, when your fix is ready.")
-    return spec
+    return {"type": "function", "function": {
+        "name": SUBMIT_TOOL,
+        "description": ("Submit your fix: a one or two sentence explanation and the edits. "
+                        "Call this exactly once, when your fix is ready."),
+        "parameters": proposal_schema(),
+    }}
 
 
 def proposal_from_args(args: dict) -> FixProposal:
@@ -172,24 +183,38 @@ def apply_edits(html: str, edits: list[Edit]) -> str:
     """Apply edits in order. All or nothing: if any edit fails, nothing is changed.
 
     Each ``find`` must match exactly one place (whitespace differences are
-    tolerated, because models often re-indent copied text). A ``find`` that
-    matches nowhere, or in several places, is reported back to the model.
+    tolerated, because models often re-indent copied text), unless
+    ``replace_all`` is set, which changes every match. ``<<start>>`` and
+    ``<<end>>`` insert at the beginning or end, which is how a fragment gets
+    wrapped (``<main>`` ... ``</main>``) without guessing its last tag. A
+    ``find`` that matches nowhere, or in several places, is reported back to
+    the model with what to do instead.
     """
     result, problems = html, []
     for number, edit in enumerate(edits, start=1):
+        anchor = edit.find.strip().lower()
+        if anchor == START:
+            result = edit.replace + result
+            continue
+        if anchor == END:
+            result = result + edit.replace
+            continue
         if not edit.find.strip():
             problems.append(f"Edit {number}: the find text is empty.")
             continue
         spans = _spans(result, edit.find)
         if not spans:
             problems.append(f'Edit {number}: the find text was not found (it begins "{_short(edit.find)}"). '
-                            "Copy it exactly from the HTML shown.")
-        elif len(spans) > 1:
+                            "Copy it exactly from the HTML shown; the HTML may be a fragment, so tags such as "
+                            f'</body> may not exist. To add something at the very beginning or end, use "{START}" '
+                            f'or "{END}" as find.')
+        elif len(spans) > 1 and not edit.replace_all:
             problems.append(f'Edit {number}: the find text occurs {len(spans)} times ("{_short(edit.find)}"). '
-                            "Include more of the surrounding HTML so it matches only one place.")
+                            "If every copy needs the same change, set replace_all to true; otherwise include more "
+                            "of the surrounding HTML so it matches only one place.")
         else:
-            start, end = spans[0]
-            result = result[:start] + edit.replace + result[end:]
+            for start, end in reversed(spans):          # from the end, so earlier positions stay valid
+                result = result[:start] + edit.replace + result[end:]
     if problems:
         raise EditError(problems)
     return result
@@ -199,8 +224,9 @@ def describe_edits(edits: list[dict] | list[Edit], limit: int = 120) -> str:
     """One line per edit, shortened, for prompts, traces and reports."""
     lines = []
     for e in edits:
-        find, replace = (e["find"], e["replace"]) if isinstance(e, dict) else (e.find, e.replace)
-        lines.append(f'"{_short(find, limit)}" -> "{_short(replace, limit)}"')
+        find, replace, every = ((e["find"], e["replace"], e.get("replace_all", False)) if isinstance(e, dict)
+                                else (e.find, e.replace, e.replace_all))
+        lines.append(f'"{_short(find, limit)}" -> "{_short(replace, limit)}"' + (" (every copy)" if every else ""))
     return "; ".join(lines)
 
 

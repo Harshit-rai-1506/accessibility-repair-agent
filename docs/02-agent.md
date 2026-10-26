@@ -405,6 +405,47 @@ says how the rule ended (`fixed`, `improved`, `not_fixed`, `too_large`).
 
 ---
 
+## 14. Error analysis, round 1
+
+The first full dev runs (Mistral Small 4, October 2026) were mixed:
+
+| Method | Score | Deletions count as failures | Target rule fixed | Broke another rule | Deleted content |
+|---|---|---|---|---|---|
+| zero_shot | 0.61 | 0.60 | 30/40 | 7 | 2 |
+| accessguru | 0.75 | 0.47 | 34/40 | 5 | 11 |
+| agent | 0.59 | 0.59 | 25/40 | 2 | 0 |
+| agent_tools | 0.67 | 0.67 | 28/40 | 1 | 0 |
+
+The agent was the safest method (no deletions, almost nothing broken) and
+the best on colour contrast (7 of the 11 contrast items against zero-shot's 5), but it fixed the
+target rule less often than zero-shot. `results/accessguru-dev/items__*.csv`
+has one line per item with the agent's step trace. Reading the failures
+showed five causes, none of them about the model's knowledge:
+
+| Cause | Items | What the trace showed | Fix |
+|---|---|---|---|
+| Duplicate text | 165, 170, 069, 010 | Snippets repeat the same `<img>` or CSS rule (carousel clones, repeated rules); every edit was rejected as "occurs 2 times" | `replace_all` on an edit changes every copy |
+| Fragments, not pages | 121, 122, 131, 039 | The snippet is only `<html lang="en">`; the model edited a `</body>` or `</html>` that is not there | `<<start>>` / `<<end>>` insert at the beginning or end; the prompt says the HTML may be a fragment |
+| New content trips `region` | 135, 141, 142, 187 | A new `<h1>` or label outside any landmark made "region" fail, three times in a row | Feedback now says how to pass the newly broken rule, in axe-core's words ("All page content is contained by landmarks"); the prompt says new content must not break other rules |
+| Many failing elements | 175, 100 | Attempt 1 fixed 5 of 55 images; attempts 2 and 3 were cut off at 3,072 tokens, and the partial fix was thrown away | The reply budget grows with the number of failing elements (within the provider's limit), and **progress is kept**: a change that fixes some elements and breaks nothing becomes the starting point for the next attempt |
+| Repeating itself | 039 | The same failed edit three times | Feedback points out a repeated change |
+
+Two habits worth keeping from this:
+
+- **Read the failures before changing anything.** Every fix above came from
+  a trace, not a guess. A retrieval system (Phase 4) would not have fixed any
+  of them, and adding it first would have hidden the real problems.
+- **Fix mechanisms, not items.** Each change is general (any duplicated
+  text, any fragment, any rule's pass conditions), and the test set has not
+  been looked at. Tuning on dev is what dev is for; the test set stays
+  untouched until the end.
+
+**Deletions count as failures.** The metric alone rewards deleting the broken
+element. Scored with deletions as failures, AccessGuru drops from 0.75 to
+0.47, below every other method. The report now shows both numbers.
+
+---
+
 ## What you can now explain
 
 - **Workflow versus agent**, and why a verified loop is the right amount of autonomy here.
@@ -420,6 +461,8 @@ says how the rule ended (`fixed`, `improved`, `not_fixed`, `too_large`).
 - **Checkpointing**: threads, resuming a stopped run, state history.
 - **Observability**: streamed steps, per-call token accounting, LangSmith traces.
 - **Testing agents with scripted fake models**.
+- **Error analysis**: reading traces to find mechanical causes, fixing them
+  generally, and keeping the test set out of it.
 
 ## Next: Phase 3
 

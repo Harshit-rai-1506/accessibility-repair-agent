@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 
 from .content import DROPPED_CONTENT, content_kept
+from .prompts import pass_conditions
 from .scanner import ScanResult, Violation
 from .scoring import evaluate_fix
 
@@ -54,7 +55,9 @@ def judge_fix(before: ScanResult, after: ScanResult, rule_id: str, original_html
     if not outcome.target_fixed:
         problems.append(f'The rule "{rule_id}" still fails: {describe_failures(after.get(rule_id))}.')
     for rule in outcome.introduced:
-        problems.append(f'Your change made another rule fail, "{rule}": {describe_failures(after.get(rule))}.')
+        hint = pass_conditions(rule)
+        problems.append(f'Your change made another rule fail, "{rule}": {describe_failures(after.get(rule))}.'
+                        + (f' To pass "{rule}": {hint}.' if hint else ""))
     if not content_ok:
         problems.append(f"Your change removed content (kept {text:.0%} of the words and {elements:.0%} "
                         "of the elements). Keep all existing text and elements.")

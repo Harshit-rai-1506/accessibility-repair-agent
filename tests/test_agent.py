@@ -199,6 +199,37 @@ def test_checkpoints_let_a_stopped_run_resume(tmp_path):
     assert resumed.calls == 2                            # only the two rules that were left
 
 
+def test_partial_progress_is_kept_between_attempts():
+    """Fix one of two failing images per attempt: the second attempt starts from the first one's result."""
+    two = IMG_ONLY.replace('<img src="cat.png">', '<img src="cat.png"><img src="dog.png">')
+    first = proposal(('<img src="cat.png">', '<img src="cat.png" alt="A cat">'))
+    second = proposal(('<img src="dog.png">', '<img src="dog.png" alt="A dog">'))
+    state, llm = run_agent(two, [first, second], targets=["image-alt"])
+    assert outcome(state, "image-alt")["status"] == "fixed" and outcome(state, "image-alt")["attempts"] == 2
+    assert 'alt="A cat"' in state["current_html"] and 'alt="A dog"' in state["current_html"]
+    assert "Progress: your change fixed 1 of the 2 failing elements" in llm.prompts[1]
+    assert 'alt="A cat"' in llm.prompts[1]                       # the retry is shown the improved HTML
+
+
+def test_repeating_a_failed_change_is_pointed_out():
+    state, llm = run_agent(IMG_ONLY, [NOT_THERE], targets=["image-alt"], max_attempts=2)
+    assert "same change as attempt 1" in state["feedback"][-1]["problem"]
+
+
+def test_reply_budget_grows_with_failing_elements():
+    from a11y_agent.agent import reply_budget
+    groq = ModelClient("groq:openai/gpt-oss-120b", llm=object())
+    mistral = ModelClient("mistralai:mistral-small-2603", llm=object())
+    assert reply_budget({"node_count": 1}, mistral) == 3072
+    assert reply_budget({"node_count": 55}, mistral) > 9000          # dev item accessguru-175: 55 images
+    assert reply_budget({"node_count": 55}, groq) <= groq.max_output_tokens
+
+
+def test_feedback_says_how_to_pass_a_newly_broken_rule():
+    state, llm = run_agent(IMG_ONLY, [BREAKS_LINK, FIX_IMG], targets=["image-alt"])
+    assert 'To pass "link-name": Element has text that is visible to screen readers' in llm.prompts[1]
+
+
 def test_per_rule_log_reducer():
     assert per_rule_log(["a"], ["b"]) == ["a", "b"]
     assert per_rule_log(["a"], None) == []

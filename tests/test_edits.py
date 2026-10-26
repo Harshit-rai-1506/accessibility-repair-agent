@@ -47,7 +47,8 @@ def test_schema_is_strict():
     assert set(schema["required"]) == {"explanation", "edits"}
     assert "$defs" not in json.dumps(schema) and "$ref" not in json.dumps(schema)   # written out in place
     edit = schema["properties"]["edits"]["items"]
-    assert edit["additionalProperties"] is False and set(edit["required"]) == {"find", "replace"}
+    assert edit["additionalProperties"] is False and set(edit["required"]) == {"find", "replace", "replace_all"}
+    assert "default" not in edit["properties"]["replace_all"]
 
 
 def test_apply_exact_and_sequential():
@@ -114,3 +115,24 @@ def test_focus_keeps_structure_and_failing_elements():
 def test_proposal_model_round_trip():
     p = FixProposal.model_validate(GOOD)
     assert parse_proposal(p.model_dump_json()) == p
+
+
+def test_replace_all_changes_every_copy():
+    html = '<img src="a.png">, <img src="a.png">'
+    with pytest.raises(EditError, match="set replace_all to true"):
+        apply_edits(html, [Edit(find='<img src="a.png">', replace='<img src="a.png" alt="Logo">')])
+    fixed = apply_edits(html, [Edit(find='<img src="a.png">', replace='<img src="a.png" alt="Logo">', replace_all=True)])
+    assert fixed == '<img src="a.png" alt="Logo">, <img src="a.png" alt="Logo">'
+
+
+def test_start_and_end_anchors_wrap_a_fragment():
+    fixed = apply_edits('<html lang="en">', [Edit(find="<<start>>", replace="<main>"), Edit(find="<<end>>", replace="</main>")])
+    assert fixed == '<main><html lang="en"></main>'
+    with pytest.raises(EditError, match="<<end>>"):                # the hint when a guessed closing tag is missing
+        apply_edits('<html lang="en">', [Edit(find="</body>", replace="<main></main></body>")])
+
+
+def test_replace_all_is_optional_when_parsing():
+    p = parse_proposal(json.dumps({"explanation": "x", "edits": [{"find": "a", "replace": "b"}]}))
+    assert p.edits[0].replace_all is False
+    assert "every copy" in describe_edits([{"find": "a", "replace": "b", "replace_all": True}])
