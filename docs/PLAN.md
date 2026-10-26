@@ -282,7 +282,12 @@ model, tool-server security.
   (numbers in [04-retrieval.md](04-retrieval.md#7-measuring-retrieval-on-its-own)).
 - The agent: a `retrieve` node (once per rule) puts three W3C passages in the
   prompt; MCP tool `search_wcag`; method D `agent_rag` (agent_tools + retrieval).
-- Guide: [docs/04-retrieval.md](04-retrieval.md). 176 tests.
+- CI fails if hybrid search ranks worse than keywords alone
+  (`retrieval eval --check`, Linux and Windows).
+- Found on Windows: a stdio MCP server deadlocked on its first numpy import
+  while waiting for the next message; fixed by giving the protocol its own
+  stdin handle (`own_stdin`, [03-mcp-tools.md](03-mcp-tools.md#2-the-server)).
+- Guide: [docs/04-retrieval.md](04-retrieval.md). 177 tests.
 
 **Concepts:** chunking, embeddings, vector stores (and when not to use a
 database), metadata filtering, hybrid search, retrieval evaluation, context

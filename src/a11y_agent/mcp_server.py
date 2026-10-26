@@ -35,6 +35,7 @@ import argparse
 import asyncio
 import difflib
 import ipaddress
+import os
 import socket
 import sys
 from collections.abc import AsyncIterator
@@ -353,6 +354,27 @@ def repair_violation(rule_id: str, html: str) -> str:
             f"```html\n{html}\n```")
 
 
+def own_stdin() -> None:
+    """Give the stdio protocol its own handle to standard input, and point fd 0 at an empty file.
+
+    Over stdio, one thread is always blocked reading the next message from
+    standard input. On Windows, a pending read blocks every other operation on
+    that pipe, and some libraries touch standard input when their DLL loads
+    (numpy does): the import waits for the read, the read waits for the client,
+    and the client waits for our answer, forever. With the protocol reading a
+    private copy of the handle (not inherited by child processes) and fd 0 on
+    NUL, nothing else can reach the pipe. Harmless elsewhere, so done everywhere.
+    """
+    try:
+        protocol = os.dup(0)
+    except OSError:                                     # no standard input at all: nothing to protect
+        return
+    sys.stdin = open(protocol, "r", encoding="utf-8")   # what the MCP stdio transport reads
+    empty = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(empty, 0)
+    os.close(empty)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the accessibility MCP server.")
     parser.add_argument("--http", action="store_true", help="serve over streamable HTTP instead of stdio")
@@ -364,6 +386,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"MCP server on http://{args.host}:{args.port}{mcp.settings.streamable_http_path}", file=sys.stderr)
         mcp.run(transport="streamable-http")
     else:
+        own_stdin()
         mcp.run(transport="stdio")       # stdout carries the protocol: never print to it
     return 0
 

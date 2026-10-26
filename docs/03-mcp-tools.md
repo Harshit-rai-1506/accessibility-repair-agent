@@ -86,6 +86,18 @@ Things worth copying into any tool server:
 - **stdout belongs to the protocol.** Over stdio, anything printed to
   standard output corrupts the messages, so the server only logs (to stderr,
   warnings only).
+- **So does stdin** (found in Phase 4, on Windows only). One thread of a
+  stdio server is always blocked reading the next message. On Windows a
+  pending read blocks every other operation on that pipe, and numpy's DLL
+  touches standard input when it loads. The first `search_wcag` call imported
+  numpy, the import waited for the read, the read waited for the client, and
+  the client waited for the answer: a deadlock that never happened on Linux.
+  CI found it by having the hung server dump its own thread stacks (Python's
+  `faulthandler`). The fix, `own_stdin()`: the protocol reads a private copy
+  of the stdin handle, and file descriptor 0 points at an empty file, so
+  nothing else can reach the pipe. Importing numpy at start-up would also
+  have worked, but only for numpy; the general fix also covers onnxruntime,
+  which loads later.
 
 **Safety, because a server can be called by anything that connects to it:**
 
@@ -296,7 +308,8 @@ every client does, and uses scripted fake models:
   falls back to `"auto"`;
 - `agent_tools` works inside the evaluation harness, and a second run is
   answered entirely from the cache;
-- the same server works over streamable HTTP.
+- the same server works over streamable HTTP;
+- over stdio the server keeps standard input to itself (see section 2).
 
 `tests/test_contrast.py` checks the formula against known values and that
 every suggestion really passes, including with axe-core itself.

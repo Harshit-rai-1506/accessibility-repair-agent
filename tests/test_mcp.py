@@ -263,3 +263,15 @@ def test_agent_rag_as_an_evaluation_method(tmp_path, hash_embeddings):
                                          limiter=RateLimiter(), quiet=True))
     assert summary["all"]["score_decrease"] == 1.0
     assert "search_wcag" in llm.offered[0] and "contrast_fix" in llm.offered[0]
+
+
+def test_the_stdio_server_keeps_standard_input_to_itself():
+    """Over stdio the protocol reads a private copy of stdin and fd 0 is empty, so a library
+    touching standard input (numpy's DLL does, on Windows) cannot deadlock with the pending read."""
+    import subprocess
+    import sys
+    code = ("import os, sys; from a11y_agent.mcp_server import own_stdin; own_stdin(); "
+            "print(sys.stdin.readline().strip(), repr(os.read(0, 10)))")
+    done = subprocess.run([sys.executable, "-c", code], input="first message\n", capture_output=True,
+                          text=True, timeout=60, cwd=ROOT)
+    assert done.stdout.strip() == "first message b''", done.stderr

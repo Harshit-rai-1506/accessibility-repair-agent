@@ -143,16 +143,23 @@ Measured in CI with the real model (2,357 chunks, 75 queries):
 | Search | hit@1 | hit@3 | hit@10 | MRR@10 |
 |---|---|---|---|---|
 | BM25 (keywords) | 0.59 | 0.80 | 0.91 | 0.71 |
-| Dense (bge-small embeddings) | 0.60 | 0.79 | 0.88 | 0.71 |
-| **Hybrid (RRF)** | **0.63** | **0.85** | **0.91** | **0.73** |
+| Dense (bge-small embeddings) | 0.63 | 0.77 | 0.89 | 0.72 |
+| **Hybrid (RRF)** | **0.64** | **0.83** | **0.93** | **0.74** |
 
 Reading it: keywords and embeddings are about equally good on their own,
-and fusing their rankings beats both: the right criterion is in the top three
-for 85% of rules, against 80% and 79%.
+and fusing their rankings is best on three of the four measures.
 The gains are a few points, not dramatic, which is typical when the queries
 use the same vocabulary as the documents (axe-core's help texts are written
-in WCAG's terms). Hybrid search is kept because it is never worse here and
-it is the safer choice for queries that do not share that vocabulary.
+in WCAG's terms). Hybrid search is kept because it is never clearly worse
+here and it is the safer choice for queries that do not share that vocabulary.
+
+**How much a few points mean.** With 75 queries, one query is 1.3 points of
+hit@k, so differences of 2–3 points are a couple of queries. Even the vectors
+move a little: the 8-bit model scales its numbers per batch, and when the
+batching changed (texts grouped by length, section 3), dense hit@3 went from
+0.79 to 0.77 and hit@1 from 0.60 to 0.63 with nothing else changed. Treat
+differences of this size as noise; the check below uses a 0.02 tolerance for
+that reason.
 
 In the agent the search is also filtered to the rule's criteria, so every
 passage it sees belongs to the right criterion; the measurement above shows
