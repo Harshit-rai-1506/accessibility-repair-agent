@@ -252,6 +252,77 @@ python -m a11y_agent.evaluate report --save
 
 ---
 
+## 11. What retrieval did in the agent: dev results
+
+All methods on Mistral Small 4, the same 40 dev items, after the round-2
+agent fixes (docs/02-agent.md §15):
+
+| Method | Score decrease | Resolved | Element-level (26) | Page-level resolved (14) | Broke another rule | Tokens per item |
+|---|---|---|---|---|---|---|
+| Zero-shot | 0.61 | 23/40 | 0.62 | 8 | 7 | 1,825 |
+| Agent (C) | 0.68 | 28/40 | 0.66 | 10 | 0 | 7,721 |
+| **Agent + MCP tools** | **0.78** | **31/40** | **0.72** | **13** | 2 | 15,710 |
+| Agent + tools + retrieval (D) | 0.64 | 26/40 | 0.64 | 9 | 1 | 19,760 |
+
+**Retrieval did not help: 0.64 against 0.78, at 26% more tokens.** Two
+things make the size of that gap uncertain, and the traces explain it.
+
+**How much is chance.** Item by item, `agent_rag` lost 7 items that
+`agent_tools` fixed and won 2. That is lopsided, but any two agent variants
+here disagree on about 10 of 40 items (the plain agent and `agent_tools`
+split 4 and 7), and a split of 7 to 2 happens by chance about one time in
+five (sign test, p ≈ 0.18). Most of the gap is on the page-level rules
+(13 against 9 resolved); on the 26 element-level items the two resolved 18
+and 17.
+
+**What went wrong on the 7 losses.** The passages were on topic: H42 "Using
+h1-h6 to identify headings" for a missing heading, ARIA11 and H101 for a
+missing `main` landmark, G18 for contrast. None of the failed edits copied
+anything from them. The failures are the mechanical ones from the earlier
+error analyses: a `find` text that is not in the page (`</html>` in a
+fragment that has none, `<<start>>` followed by page text), repeated after
+the feedback said so, and long pages running out of attempts. With three
+passages more in every prompt, the model's attempts took a different path,
+and on these items a worse one. Recovering from a failed attempt is
+sensitive to small prompt changes; adding knowledge does not fix it.
+
+So this is the result the round-1 analysis (docs/02-agent.md §14) predicted:
+on this dev set the agent fails on mechanics, not on not knowing WCAG, and
+retrieval cannot help with mechanics.
+
+**Two retrieval defects seen in the traces**, worth fixing before the test
+run but not by tuning on these 40 items:
+
+- *Duplicates.* The three passages are often from the same page (ARIA11
+  twice, ARIA14 three times), so the prompt carries one technique instead of
+  three. One passage per page would fix it.
+- *Rules without a success criterion.* Best-practice rules search everything,
+  and `empty-heading` got F46 (table headers) and ARIA7 (link purpose).
+
+**Decision.** `agent_tools` stays the main method, and Phase 5's guardrails
+are built on it (method E = agent + tools + guardrails). Retrieval stays in
+the comparison as method D and is reported on the test set as measured: a
+negative result for a popular technique is a finding, not a failure. The
+retrieval system itself works (the right criterion in the top three for 84%
+of rules); what this shows is that in this task, the model's bottleneck was
+elsewhere.
+
+**What the results hand to Phase 5.** Reading every accepted fix turned up
+three things the scanner does not object to:
+
+- *Leftover markup.* An accepted `agent_tools` fix for `page-has-heading-one`
+  ends the page with a literal `<</end>>` (a mistyped anchor) and puts
+  `<main>` before `<html>`. axe-core passes it.
+- *Invented text.* Every accepted fix for `page-has-heading-one`, in all
+  three agent methods, adds a heading the model made up: "Page Content",
+  "Page Title", "Hauptinhalt". The scanner is satisfied; a reader is not.
+  Only a person knows what the heading should say.
+- *Hidden text.* Attempts like `<span class="visually-hidden">Featured</span>`
+  inside an empty heading satisfy the rule for screen readers while sighted
+  users see nothing.
+
+---
+
 ## What you can now explain
 
 - **RAG's three steps**, and when retrieval is (and is not) the bottleneck.
@@ -262,6 +333,7 @@ python -m a11y_agent.evaluate report --save
 - **When a vector database is worth it**, and the VectorStore interface that keeps the choice open.
 - **Evaluating retrieval on its own**: a query set, a relevance definition, hit@k and MRR.
 - **RAG as a graph node** and as an MCP tool.
+- **Reading an ablation honestly**: item-level flips, chance, and where the bottleneck really is.
 
 ## Next: Phase 5
 

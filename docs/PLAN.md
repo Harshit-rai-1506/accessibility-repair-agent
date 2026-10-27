@@ -133,7 +133,7 @@ Tuning prompts on the test set would make the final numbers meaningless.
 | B | AccessGuru-style prompt with one re-prompt | The published method, on our model |
 | C | Our agent, no retrieval | Value of the verify-and-retry loop |
 | D | Our agent + retrieval | Value of WCAG knowledge |
-| E | Our agent + retrieval + guardrails | Cost of safety, in score and in rejected fixes |
+| E | Our agent + tools + guardrails (no retrieval: it did not help on dev) | Cost of safety, in score and in rejected fixes |
 
 Main model: gpt-oss-120b. Repeat A and E on gpt-oss-20b to see how much the
 larger model matters. The paper's published numbers (0.84 GPT-4, 0.82
@@ -266,7 +266,7 @@ model, tool-server security.
 (plumbing: ✅ identical results in tests); `agent_tools` measured on dev.
 *Remaining:* the dev runs of `agent` and `agent_tools`.
 
-### Phase 4: Retrieval over WCAG ✅ built
+### Phase 4: Retrieval over WCAG ✅ done
 
 **Built**
 - `retrieval.py`: the Phase 0 Documents (581 WCAG pages, 105 axe rules) cut
@@ -293,8 +293,16 @@ model, tool-server security.
 database), metadata filtering, hybrid search, retrieval evaluation, context
 budgets, RAG as a graph node and as a tool.
 **Done when:** retrieval scores are reported (✅ in CI) and method D is
-measured. *Remaining:* the dev runs (`agent`, `agent_tools` with the
-round-2 fixes, and `agent_rag`).
+measured (✅ 27 Oct, dev).
+
+**Result (dev, Mistral Small 4):** agent 0.68, agent + tools 0.78, agent +
+tools + retrieval 0.64 at 26% more tokens. The passages were on topic; the
+losses are the agent's mechanical failures taking a different path, and a
+7-to-2 item split is within chance on 40 items
+([04-retrieval.md §11](04-retrieval.md#11-what-retrieval-did-in-the-agent-dev-results)).
+**Decision:** method E builds on agent + tools without retrieval; D stays in
+the final comparison. Before the test run: one passage per page in the
+guidance (duplicates seen), not tuned on dev.
 
 ### Phase 5: Guardrails and human approval (about 3–4 hours)
 

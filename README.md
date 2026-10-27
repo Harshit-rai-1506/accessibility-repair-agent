@@ -8,7 +8,8 @@ guardrails. Runs on free, open-weight models.
 > **Status:** Phases 0–4 are built and tested on Linux and Windows: setup,
 > evaluation harness and baselines, the LangGraph agent, an MCP tool server
 > the agent uses as a client, and retrieval over the WCAG documents. Dev-set
-> results below; the Phase 4 dev run is next. See the [build plan](docs/PLAN.md).
+> results below; guardrails and human approval (Phase 5) are next. See the
+> [build plan](docs/PLAN.md).
 
 ## The problem
 
@@ -45,17 +46,21 @@ Every method run on the same model and the same 40 items:
 |---|---|---|---|---|---|---|
 | Zero-shot prompt | 0.61 | 0.60 | 23/40 | 7 | 2 | 1,825 |
 | AccessGuru prompting (ASSETS 2025) | 0.75 | **0.47** | 29/40 | 5 | **11** | 25,510 |
-| Our agent (Phase 2) | 0.66 | 0.66 | 26/40 | **0** | **0** | 2,735 |
-| **Our agent with MCP tools** (Phase 3) | **0.72** | **0.72** | 28/40 | 1 | **0** | 11,839 |
+| Our agent (Phase 2) | 0.68 | 0.68 | 28/40 | **0** | **0** | 7,721 |
+| **Our agent with MCP tools** (Phase 3) | **0.78** | **0.78** | **31/40** | 2 | **0** | 15,710 |
+| Agent + tools + WCAG retrieval (Phase 4) | 0.64 | 0.64 | 26/40 | 1 | **0** | 19,760 |
 
 Score decrease is 1 − (violation score after ÷ before), from the AccessGuru
 paper: 1.0 means every target fixed with nothing broken. The metric alone
 rewards deleting the broken element, so the second column scores a fix that
 removed content as no fix: AccessGuru's lead comes from deletions (11 of 40
-items). The agent rows are after one round of error analysis
-([docs/02-agent.md §14–15](docs/02-agent.md#14-error-analysis-round-1));
-a second round of fixes (for page-level rules) is in and will be measured
-with Phase 4. Full tables, per-item outcomes
+items). The agent rows are after two rounds of error analysis
+([docs/02-agent.md §14–15](docs/02-agent.md#14-error-analysis-round-1)).
+Retrieval did not help: the passages were on topic, but the agent's failures
+are mechanical, not a lack of WCAG knowledge, and the gap is within what
+chance could do on 40 items
+([docs/04-retrieval.md §11](docs/04-retrieval.md#11-what-retrieval-did-in-the-agent-dev-results)).
+Full tables, per-item outcomes
 and the agent's step traces: [results/accessguru-dev](results/accessguru-dev/README.md).
 The test set is held back until the end.
 
@@ -171,9 +176,9 @@ Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 |---|---|---|---|
 | 0 | Environment, pinned resources, LangChain document loaders, scanner, scoring, model client, CI | Ground truth, reproducibility, Documents | ✅ Done |
 | 1 | Fixed dev/test split, evaluation harness, zero-shot and AccessGuru baselines | Evals before agents, caching, rate limits | ✅ Done (dev numbers in) |
-| 2 | LangGraph agent: scan → fix → verify → retry, with state and checkpoints | Graphs, state, reducers, conditional edges, structured output, checkpoints | ✅ Built; dev run pending |
-| 3 | MCP server exposing the scanner, fix checker, rule explanations and a contrast calculator; agent calls them as a client | MCP (tools, resources, prompts, stdio/HTTP), function calling | ✅ Built; dev run pending |
-| 4 | Retrieval over WCAG Understanding docs and Techniques, as a graph node and an MCP tool | Chunking, embeddings, hybrid search, metadata filters, retrieval evaluation | ✅ Built; dev run pending |
+| 2 | LangGraph agent: scan → fix → verify → retry, with state and checkpoints | Graphs, state, reducers, conditional edges, structured output, checkpoints | ✅ Done (0.68 vs zero-shot 0.60) |
+| 3 | MCP server exposing the scanner, fix checker, rule explanations and a contrast calculator; agent calls them as a client | MCP (tools, resources, prompts, stdio/HTTP), function calling | ✅ Done (0.78, best so far) |
+| 4 | Retrieval over WCAG Understanding docs and Techniques, as a graph node and an MCP tool | Chunking, embeddings, hybrid search, metadata filters, retrieval evaluation | ✅ Done (did not help on dev; kept as method D) |
 | 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | Planned |
 | 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, reporting | Planned |
 
