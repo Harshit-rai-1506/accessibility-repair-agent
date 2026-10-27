@@ -43,9 +43,9 @@ dev runs (docs/05-guardrails.md §10):
 - the guard's feedback says how to fix broken markup;
 - retrieval returns one passage per page.
 
-Then the code was frozen. The commit is tagged **`test-freeze`** on GitHub,
-and every result row now records the commit that produced it (the `code`
-field). A run that was resumed after a code change therefore shows up in the
+Then the code was frozen at commit `a4dc45b`, tagged **`test-freeze`**
+(Step 0 below creates the tag). Every result row now records the commit that
+produced it (the `code` field). A run that was resumed after a code change therefore shows up in the
 report as using two versions, instead of silently mixing them.
 
 ## 3. How the numbers are read
@@ -119,11 +119,20 @@ About 6 to 8 hours of runs in all, mostly unattended, and roughly 20 million
 tokens. Mistral's free tier allows 1 billion a month. Every command resumes
 where it stopped, so it can be split over several sittings.
 
+**Step 0: get the frozen code and check it on your machine**
+
 ```bash
 git pull
 pip install -e ".[dev]"
 python scripts/check_setup.py
+python -m pytest
+git tag -a test-freeze a4dc45b -m "Code frozen for the test-set runs"
+git push origin test-freeze
 ```
+
+`python -m pytest` should end with "246 passed, 2 skipped" or similar, with
+no failures. (While the repository is private, GitHub's CI needs Actions
+minutes on your account, so this run is the check on Windows.)
 
 **Step 1: confirm the last fixes on dev** (about 1 hour; the four agent
 methods changed, so `--fresh` re-runs them; unchanged replies come from the
