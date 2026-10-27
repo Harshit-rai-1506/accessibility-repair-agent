@@ -30,6 +30,13 @@ All items:
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | accessguru | mistral-small-2603 | 40/40 | 0.75 | 0.47 | 0.70 | 29/40 | 5 | 11 | 0 | 25510 | $0.27 |
 | agent | mistral-small-2603 | 40/40 | 0.68 | 0.68 | 0.66 | 28/40 | 0 | 0 | 0 | 7721 | $0.07 |
+| agent_guarded | mistral-small-2603 | 40/40 | 0.64 | 0.64 | 0.72 | 24/40 | 2 | 0 | 0 | 15916 | $0.01 |
 | agent_rag | mistral-small-2603 | 40/40 | 0.64 | 0.64 | 0.64 | 26/40 | 1 | 0 | 0 | 19760 | $0.15 |
 | agent_tools | mistral-small-2603 | 40/40 | 0.78 | 0.78 | 0.72 | 31/40 | 2 | 0 | 0 | 15710 | $0.12 |
 | zero_shot | mistral-small-2603 | 40/40 | 0.61 | 0.60 | 0.62 | 23/40 | 7 | 2 | 0 | 1825 | $0.03 |
+
+Guardrails (Phase 5): what they stopped, rejected and flagged:
+
+| Method | Model | Pages blocked at input | Items with a rejected attempt | Rejected attempts by reason | Changes flagged for review | Flags by kind |
+|---|---|---|---|---|---|---|
+| agent_guarded | mistral-small-2603 | 0/40 | 10/40 | broken_markup 20 | 26/40 | changed_colours 9, added_text_alternative 9, adds_landmarks 8, marked_decorative 2, sets_language 1 |
