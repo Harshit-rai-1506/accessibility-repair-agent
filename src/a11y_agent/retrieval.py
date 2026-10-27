@@ -35,6 +35,7 @@ import json
 import re
 import sys
 import time
+from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -189,15 +190,19 @@ class WcagIndex:
 
     def search(self, query: str, k: int = 3, *, criteria: list[str] | None = None,
                doc_types: tuple[str, ...] | None = None, rule_id: str | None = None,
-               mode: str = "hybrid") -> list[Hit]:
+               mode: str = "hybrid", per_page: int = 0) -> list[Hit]:
         """The ``k`` best chunks. ``criteria`` (e.g. ["1.1.1"]) keeps only chunks for those
         success criteria; ``doc_types`` keeps only those page types; ``mode`` is
-        "hybrid", "bm25" or "dense"."""
+        "hybrid", "bm25" or "dense"; ``per_page`` (if set) keeps at most that many
+        chunks from one page, so k passages are k different techniques."""
         allowed = self._filter(criteria, doc_types, rule_id)
+        wanted = k * 5 if per_page else k
         if mode == "bm25":
-            return [Hit(d, s, bm25_rank=r) for r, (d, s) in enumerate(self.bm25_ranking(query, allowed, k), 1)]
+            hits = [Hit(d, s, bm25_rank=r) for r, (d, s) in enumerate(self.bm25_ranking(query, allowed, wanted), 1)]
+            return _per_page(hits, k, per_page)
         if mode == "dense":
-            return [Hit(d, s, dense_rank=r) for r, (d, s) in enumerate(self.dense_ranking(query, allowed, k), 1)]
+            hits = [Hit(d, s, dense_rank=r) for r, (d, s) in enumerate(self.dense_ranking(query, allowed, wanted), 1)]
+            return _per_page(hits, k, per_page)
 
         fused: dict[str, Hit] = {}
         for name, ranking in (("bm25", self.bm25_ranking(query, allowed, CANDIDATES)),
@@ -206,10 +211,26 @@ class WcagIndex:
                 hit = fused.setdefault(doc.id, Hit(doc, 0.0))
                 hit.score += 1.0 / (RRF_K + rank)            # reciprocal rank fusion
                 setattr(hit, f"{name}_rank", rank)
-        return sorted(fused.values(), key=lambda h: -h.score)[:k]
+        return _per_page(sorted(fused.values(), key=lambda h: -h.score), k, per_page)
 
     def as_retriever(self, **search_options) -> "WcagRetriever":
         return WcagRetriever(index=self, search_options=search_options)
+
+
+def _per_page(hits: list[Hit], k: int, per_page: int) -> list[Hit]:
+    """The first ``k`` hits, with at most ``per_page`` from any one page (0 = no limit)."""
+    if not per_page:
+        return hits[:k]
+    seen: Counter = Counter()
+    kept = []
+    for hit in hits:
+        page = hit.document.metadata.get("url") or hit.document.metadata.get("title", "")
+        if seen[page] < per_page:
+            seen[page] += 1
+            kept.append(hit)
+            if len(kept) == k:
+                break
+    return kept
 
 
 class WcagRetriever(BaseRetriever):
@@ -238,7 +259,7 @@ class LocalRetriever:
 
     async def guidance(self, query: str, criteria: list[str] | None, k: int = 3) -> list[dict]:
         index = self._index or shared_index()
-        return [h.as_dict() for h in index.search(query, k, criteria=criteria, doc_types=GUIDANCE_TYPES)]
+        return [h.as_dict() for h in index.search(query, k, criteria=criteria, doc_types=GUIDANCE_TYPES, per_page=1)]
 
 
 # ---------------------------------------------------------------------------

@@ -345,18 +345,44 @@ human-in-the-loop.
   setup check lines "Guardrails" and "Prompt guard".
 - `scan_url` now checks every request and redirect against the public-address rule (SSRF).
 - Guide: [docs/05-guardrails.md](05-guardrails.md). 225 tests.
-- *Remaining:* the dev run of `agent_guarded` and `guardrails eval --save`
-  with the classifier (needs the user's keys).
+- **Dev result** (28 Oct): agent_guarded 0.64 vs agent_tools 0.78 (paired
+  −0.14, −0.26 to −0.06): no cost on element-level items (0.72 both); all 7
+  losses page-level, 20 `broken_markup` rejections (2 real garbage fixes
+  that axe-core accepted, 5 with `<main>` before `<html>`, plus feedback too
+  vague to act on). Input screen: 0/40 false alarms; rules 5/6 attacks,
+  Prompt Guard 2 3/6 (explicit overrides only, as its model card says).
+  Review flags on 26/40 changes. Fixed before the freeze (all agent methods):
+  prompt rule on where new content goes, anchors refused outside the page and
+  when mistyped, specific guard feedback. See 05-guardrails.md §10.
 - *Not done, noted:* a browser-rendered check of visible text (CSS classes
   that hide text are only caught by their usual names).
 
-### Phase 6: Results and write-up (about 3 hours + run time)
+### Phase 6: Results and write-up (set up 28 Oct; runs next)
 
 **Build:** run all methods on the test set; error analysis of 20 failures;
 cost and latency table; before/after report on a few public pages; README
 results and resume bullets.
 **Done when:** someone reading only the README can see what the agent does,
 how well, at what cost, and where it fails.
+
+**Built**
+- The freeze: last dev-based fixes (above, and one retrieval passage per page),
+  then the commit tagged `test-freeze`; every result row records its commit.
+- `stats.py` and `evaluate compare`: each score with a 95% bootstrap
+  interval; paired differences against `agent_tools` with intervals; sign
+  tests on resolved flips; cost and speed table (calls, tokens, model and wall
+  time, cache share, paid-plan cost per 100 pages).
+- `evaluate failures`: unresolved items sorted by why (edits did not match,
+  target still fails, broke another rule, rejected by guardrails, ...), with
+  20 listed for reading.
+- `evaluate run --method a b c`: several methods in one command.
+- `scripts/public_pages.py`: before/after on real public pages.
+- Guide: [docs/06-results.md](06-results.md) (the run plan, step by step). 248 tests.
+
+*Dropped:* repeating A and E on a smaller model (gpt-oss on Groq's free tier
+allows about 200K tokens a day; method E needs about 2M for the test set).
+*Remaining:* the user's runs (dev confirmation, AccessGuru test, ACCESS,
+public pages), then the write-up.
 
 ### Optional extensions
 

@@ -8,9 +8,9 @@ guardrails. Runs on free, open-weight models.
 > **Status:** Phases 0–5 are built and tested on Linux and Windows: setup,
 > evaluation harness and baselines, the LangGraph agent, an MCP tool server
 > the agent uses as a client, retrieval over the WCAG documents, and
-> guardrails with human approval. Dev-set results below; the guardrails' dev
-> run and the final test-set runs (Phase 6) are next. See the
-> [build plan](docs/PLAN.md).
+> guardrails with human approval. Dev-set results below. Phase 6 (the final,
+> frozen runs on the 138 held-back test items) is set up; its numbers come
+> next. See the [build plan](docs/PLAN.md).
 
 ## The problem
 
@@ -43,13 +43,14 @@ it is structured, and verify every fix by scanning again.
 
 Every method run on the same model and the same 40 items:
 
-| Method | Score decrease | Deletions count as failures | Resolved | Broke another rule | Deleted content | Tokens per item |
+| Method | Score decrease | Deletions count as failures (95% interval) | Resolved | Broke another rule | Deleted content | Tokens per item |
 |---|---|---|---|---|---|---|
-| Zero-shot prompt | 0.61 | 0.60 | 23/40 | 7 | 2 | 1,825 |
-| AccessGuru prompting (ASSETS 2025) | 0.75 | **0.47** | 29/40 | 5 | **11** | 25,510 |
-| Our agent (Phase 2) | 0.68 | 0.68 | 28/40 | **0** | **0** | 7,721 |
-| **Our agent with MCP tools** (Phase 3) | **0.78** | **0.78** | **31/40** | 2 | **0** | 15,710 |
-| Agent + tools + WCAG retrieval (Phase 4) | 0.64 | 0.64 | 26/40 | 1 | **0** | 19,760 |
+| Zero-shot prompt | 0.61 | 0.60 (0.45–0.74) | 23/40 | 7 | 2 | 1,825 |
+| AccessGuru prompting (ASSETS 2025) | 0.75 | **0.47** (0.32–0.62) | 29/40 | 5 | **11** | 25,510 |
+| Our agent (Phase 2) | 0.68 | 0.68 (0.53–0.83) | 28/40 | **0** | **0** | 7,721 |
+| **Our agent with MCP tools** (Phase 3) | **0.78** | **0.78** (0.65–0.90) | **31/40** | 2 | **0** | 15,710 |
+| Agent + tools + WCAG retrieval (Phase 4) | 0.64 | 0.64 (0.49–0.79) | 26/40 | 1 | **0** | 19,760 |
+| Agent + tools + guardrails (Phase 5) | 0.64 | 0.64 (0.48–0.78) | 24/40 | 2 | **0** | 15,916 |
 
 Score decrease is 1 − (violation score after ÷ before), from the AccessGuru
 paper: 1.0 means every target fixed with nothing broken. The metric alone
@@ -61,6 +62,13 @@ Retrieval did not help: the passages were on topic, but the agent's failures
 are mechanical, not a lack of WCAG knowledge, and the gap is within what
 chance could do on 40 items
 ([docs/04-retrieval.md §11](docs/04-retrieval.md#11-what-retrieval-did-in-the-agent-dev-results)).
+The guardrails cost nothing on element-level problems (0.72 either way); all
+seven items they lost were page-level fixes that put `<main>` before `<html>`
+or left `<</end>>` in the page, which axe-core accepts and the guardrails
+reject. The edit format and the prompt were fixed for that before the final
+runs ([docs/05-guardrails.md §10](docs/05-guardrails.md#10-dev-results-and-what-they-changed)).
+With 40 items the 95% intervals are about ±0.14 wide, which is why the final
+comparison uses the 138 held-back items, with paired tests.
 Full tables, per-item outcomes
 and the agent's step traces: [results/accessguru-dev](results/accessguru-dev/README.md).
 The test set is held back until the end.
@@ -121,7 +129,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 225 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 248 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
@@ -172,7 +180,12 @@ python -m a11y_agent.evaluate run --method agent_tools       # dev split, roughl
 python -m a11y_agent.evaluate run --method agent_rag         # dev split, agent_tools + retrieval
 python -m a11y_agent.evaluate run --method agent_guarded     # dev split, agent_tools + guardrails
 python -m a11y_agent.evaluate report                         # compare everything run so far
+python -m a11y_agent.evaluate compare --save                 # 95% intervals, paired tests, cost and speed
+python -m a11y_agent.evaluate failures --method agent_guarded --save   # why items were not fixed
 ```
+
+The final runs (Phase 6) and a before/after on real public pages:
+[docs/06-results.md](docs/06-results.md).
 
 Runs resume where they stopped, and every model reply is cached, so
 re-running never pays twice. You can also run evaluations on GitHub instead
@@ -183,7 +196,8 @@ Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 [docs/02-agent.md](docs/02-agent.md) (the LangGraph agent),
 [docs/03-mcp-tools.md](docs/03-mcp-tools.md) (MCP tools),
 [docs/04-retrieval.md](docs/04-retrieval.md) (retrieval) and
-[docs/05-guardrails.md](docs/05-guardrails.md) (guardrails and human approval).
+[docs/05-guardrails.md](docs/05-guardrails.md) (guardrails and human approval) and
+[docs/06-results.md](docs/06-results.md) (final runs and how they are analysed).
 
 ## Roadmap
 
@@ -194,8 +208,8 @@ Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 | 2 | LangGraph agent: scan → fix → verify → retry, with state and checkpoints | Graphs, state, reducers, conditional edges, structured output, checkpoints | ✅ Done (0.68 vs zero-shot 0.60) |
 | 3 | MCP server exposing the scanner, fix checker, rule explanations and a contrast calculator; agent calls them as a client | MCP (tools, resources, prompts, stdio/HTTP), function calling | ✅ Done (0.78, best so far) |
 | 4 | Retrieval over WCAG Understanding docs and Techniques, as a graph node and an MCP tool | Chunking, embeddings, hybrid search, metadata filters, retrieval evaluation | ✅ Done (did not help on dev; kept as method D) |
-| 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | ✅ Built; dev run pending |
-| 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, reporting | Planned |
+| 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | ✅ Done (no cost on element-level fixes; 0/40 false alarms) |
+| 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, confidence intervals, error analysis, reporting | Set up; test runs next |
 
 Details, acceptance criteria and budget for each phase: [docs/PLAN.md](docs/PLAN.md).
 
@@ -223,10 +237,12 @@ src/a11y_agent/
     retrieval.py   chunking, BM25 + dense hybrid search, criteria filters, retrieval evaluation
     embeddings.py  bge-small embeddings on the CPU (ONNX), cached; a test stand-in
     guardrails.py  prompt-injection screen (rules + Llama Prompt Guard 2), checks on every fix, review flags
+    stats.py       bootstrap confidence intervals, paired differences, sign tests
 scripts/
     fetch_resources.py   downloads pinned, checksum-verified resources into data/
     check_setup.py       tells you exactly what is missing
     try_mcp.py           a tiny MCP client: see the server's tools in action
+    public_pages.py      before/after: the guarded agent on real public pages
 splits/            the dev/test split (row ids), made once and committed
 results/           evaluation summaries, committed after each run (runs/ holds the full, ignored, output)
 examples/          a broken page (12 violated rules), its hand-fixed version (0), and injection/ test pages

@@ -196,6 +196,14 @@ class Scanner:
         asking, so each request is fetched with redirects off, the target
         checked, and the redirect handed back to the browser.)
         """
+        _, result = await self.visit(url, allow_url=allow_url)
+        return result
+
+    async def snapshot_url(self, url: str, *, allow_url=None) -> tuple[str, ScanResult]:
+        """The page's HTML as the browser built it (after its scripts ran), and its live scan."""
+        return await self.visit(url, allow_url=allow_url)
+
+    async def visit(self, url: str, *, allow_url=None) -> tuple[str, ScanResult]:
         if self._browser is None:
             raise RuntimeError("use 'async with Scanner() as scanner:'")
         context = await self._browser.new_context()
@@ -228,7 +236,8 @@ class Scanner:
                 raise
             if blocked and page.url in blocked:
                 raise BlockedRequest(f"blocked a request to {blocked[0]}")
-            return await self._run_axe(page)
+            html = await page.content()
+            return html, await self._run_axe(page)
         finally:
             await context.close()
 

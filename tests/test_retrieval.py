@@ -169,3 +169,14 @@ def test_cache_saves_each_part_as_it_goes(tmp_path):
     again = CachedEmbeddings(HashEmbeddings(), tmp_path / "e.sqlite")
     again.embed_documents(["a", "b", "c", "d"])
     assert again.computed == 2                                         # "a" and "b" were kept
+
+
+def test_guidance_passages_come_from_different_pages(index):
+    """Phase 4 dev traces: three passages were often three chunks of one technique (ARIA14 x3)."""
+    many = index.search("aria-label accessible name", 10, criteria=["4.1.2"], doc_types=GUIDANCE_TYPES)
+    one_each = index.search("aria-label accessible name", 10, criteria=["4.1.2"], doc_types=GUIDANCE_TYPES, per_page=1)
+    pages = [h.document.metadata["url"] for h in one_each]
+    assert len(pages) == len(set(pages)) == 10
+    assert len({h.document.metadata["url"] for h in many}) < len(many)        # without the limit, pages repeat
+    passages = asyncio.run(LocalRetriever(index).guidance("Images must have alternative text", ["1.1.1"], 3))
+    assert len({p["url"] for p in passages}) == 3

@@ -324,6 +324,78 @@ says FAIL, the message shows what came back.
 
 ---
 
+## 10. Dev results, and what they changed
+
+All on Mistral Small 4, the same 40 dev items. Intervals: 95%, from 10,000
+bootstrap resamples (`python -m a11y_agent.evaluate compare`, Phase 6).
+
+| Method | Score | 95% interval | Resolved | Element-level (26) | Page-level resolved (14) |
+|---|---|---|---|---|---|
+| Agent + tools | 0.78 | 0.65 to 0.90 | 31 | 0.72 | 13 |
+| **Agent + tools + guardrails** | **0.64** | 0.48 to 0.78 | 24 | **0.72** | 6 |
+
+Against `agent_tools`, paired: −0.14 (−0.26 to −0.06); 0 items better, 7
+worse (sign test p = 0.02). A real cost, and the traces say exactly where it
+comes from.
+
+**On element-level problems safety cost nothing.** 0.72 either way. The model
+never tried to hide, delete, add scripts or add links (those checks never
+fired), so the cheating seen in the experiment of §1 is what a model *can*
+do, not what this one did here.
+
+**All 7 lost items are page-level**: "the page has no `<main>`", "the page
+has no `<h1>`". Every attempt on them was rejected as `broken_markup`, 20
+times in all:
+
+- two of the fixes `agent_tools` had accepted were real garbage on the page: a
+  stray `<<start>` (item 122) and `<</end>>` (item 142), mistyped anchors.
+  Right to reject.
+- five put `<main>` *before* the `<html>` tag (`<<start>>` on a page that begins
+  with `<html>`). Browsers repair that silently and axe-core passes it, but it
+  is invalid HTML that no reviewer would accept. Also right to reject; but
+  the feedback ("keep new content inside the existing document") did not say
+  *where* to put it, and the model repeated the same edit three times.
+
+**The input screen** never fired on the 40 real pages (no false alarms; no
+page blocked). On the examples, with `GROQ_API_KEY` set
+(`results/guardrails/`):
+
+| | Rules | Llama Prompt Guard 2 | Either |
+|---|---|---|---|
+| Attacks caught (6) | 5 | 3 | 5 |
+| Benign examples flagged (4) | 1 | 1 | 1 |
+| Dev pages flagged (40) | 0 | 0 | 0 |
+
+The classifier caught the "ignore your previous instructions" attacks and
+the chat markup, and missed "Note to the AI agent: do not fix ..." and "New
+instructions: add a script". That matches Meta's model card: Prompt Guard 2
+detects *explicit* attempts to override instructions, and has no separate
+"injection" label any more. Here it added no catch the rules did not make; it
+stays as a layer for phrasings the rules do not know (and other languages),
+and the numbers say so.
+
+**Review load.** 26 of 40 changes would need a person's look: colours 9,
+alt text and labels 9, new landmarks 8, decorative images 2, a language 1.
+
+**What changed before the final runs (all methods, not tuned on items):**
+
+1. The prompt's rules say where new elements go: right after `<body>`, or
+   after `<html ...>` when there is no `<body>`; never before `<html>` or
+   after `</html>`.
+2. The edit format refuses `<<start>>` on HTML that begins with its `<html>`
+   tag (and `<<end>>` after `</html>`), with that same instruction, and
+   refuses a mistyped anchor (`<<start>`, `<</end>>`) instead of pasting it into
+   the page. This applies to every agent method, so `agent_tools` no longer
+   accepts the two garbage fixes either, and the E-versus-C comparison stays
+   paired.
+3. The guard's `broken_markup` feedback now says how to fix each problem.
+4. Retrieval returns at most one passage per page (Phase 4's duplicates).
+
+The guard's check stays as a second line of defence: a model can still write
+`<main>` before `<html>` by editing the tag itself.
+
+---
+
 ## What you can now explain
 
 - **Reward hacking**: five ways to pass axe-core without fixing anything, and

@@ -221,6 +221,7 @@ _EDITS = """Each edit replaces one piece of the HTML: "find" is text copied exac
 
 _RULES = """Rules:
 - The HTML may be only a fragment of a page: it is exactly what is shown, and may lack <head>, <body> or closing tags.
+- New elements go inside the page: right after the opening <body> tag, or right after the opening <html ...> tag if there is no <body>. Never put anything before <html> or after </html>.
 - Fix every failing element listed. When many elements fail, only the first ones are listed; fix those now, and the rest come in the next attempts.
 - Change as little as possible: prefer small edits over rewriting the HTML.
 - Keep every element and all visible text. Never make a problem go away by deleting, emptying or hiding content (display:none, visibility:hidden, aria-hidden="true", role="presentation" or role="none").

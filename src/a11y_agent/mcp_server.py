@@ -341,6 +341,8 @@ async def search_wcag(
     k: Annotated[int, Field(ge=1, le=10, description="How many passages to return.")] = 3,
     page_types: Annotated[list[str], Field(description="Only these page types: technique, failure, understanding, "
                                                        "success_criterion, axe_rule. Empty for all.")] = [],  # noqa: B006
+    one_per_page: Annotated[bool, Field(description="At most one passage from each page, so the passages "
+                                                    "cover different techniques.")] = True,
 ) -> SearchResults:
     """Search the W3C's WCAG 2.2 Understanding documents, Techniques and Failures, and axe-core's rule texts.
 
@@ -348,7 +350,8 @@ async def search_wcag(
     """
     from .retrieval import shared_index
     index = await asyncio.to_thread(shared_index)        # built on first use (embeddings are cached)
-    hits = index.search(query, k, criteria=success_criteria or None, doc_types=tuple(page_types) or None)
+    hits = index.search(query, k, criteria=success_criteria or None, doc_types=tuple(page_types) or None,
+                        per_page=1 if one_per_page else 0)
     return SearchResults(passages=[Passage(**h.as_dict()) for h in hits])
 
 

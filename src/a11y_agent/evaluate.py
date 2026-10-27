@@ -26,6 +26,9 @@ Commands (from the repository root):
     python -m a11y_agent.evaluate run --method agent --model mistralai:mistral-small-2603
     python -m a11y_agent.evaluate report                                # compare all runs, per model
     python -m a11y_agent.evaluate report --save                         # also copy summaries to results/
+    python -m a11y_agent.evaluate run --method zero_shot agent_tools --split test    # several methods in turn
+    python -m a11y_agent.evaluate compare --split test --save           # confidence intervals, paired tests, cost
+    python -m a11y_agent.evaluate failures --method agent_guarded --split test --save   # error analysis
 """
 
 from __future__ import annotations
@@ -36,6 +39,8 @@ import contextlib
 import json
 import re
 import shutil
+import statistics
+import subprocess
 import sys
 import time
 from collections import Counter
@@ -59,6 +64,25 @@ PRICES = {
     "mistralai:mistral-small-2603": (0.15, 0.60),      # Mistral Small 4
     "mistralai:mistral-small-latest": (0.15, 0.60),
 }
+
+
+def code_version() -> str:
+    """The git commit of the code that produced a result ("+changes" if src/ differs from it).
+
+    Saved in every result row, so a run resumed after a code change shows up
+    as a run with two versions instead of silently mixing them.
+    """
+    try:
+        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True,
+                                timeout=10).stdout.strip()
+        changed = subprocess.run(["git", "diff", "--quiet", "HEAD", "--", "src"], cwd=ROOT, capture_output=True,
+                                 timeout=10).returncode != 0
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return (commit or "unknown") + ("+changes" if commit and changed else "")
+
+
+_CODE_VERSION: str | None = None
 
 
 def model_slug(spec: str | None) -> str:
@@ -113,6 +137,7 @@ async def evaluate_item(item: BenchmarkItem, method, scanner: Scanner, model: Mo
         "seconds": round(time.perf_counter() - started, 2),
         "note": result.note,
         "guard": result.guard,
+        "code": _CODE_VERSION,
         "fixed_html": result.html,
         "response": result.response,
     }
@@ -158,6 +183,7 @@ def summarize_rows(rows: list[dict], *, method: str, model: str | None, dataset:
         "model_seconds": round(sum(r["model_seconds"] for r in rows), 1),
         "paid_cost_usd": round((fresh_in * price[0] + fresh_out * price[1]) / 1e6, 4) if price else None,
         "axe_version": settings.axe_version,
+        "code_versions": sorted({r["code"] for r in rows if r.get("code")}),
     }
     summary["tokens_per_item"] = round((summary["input_tokens"] + summary["output_tokens"]) / max(len(rows), 1))
     guarded = [r["guard"] for r in rows if r.get("guard")]
@@ -187,6 +213,9 @@ async def run_evaluation(method_name: str, items: list[BenchmarkItem], *, datase
     model); by default the configured model, ``runs/cache.sqlite`` and the
     free-tier pacing from .env are used.
     """
+    global _CODE_VERSION
+    if _CODE_VERSION is None:
+        _CODE_VERSION = code_version()
     method = get_method(method_name)
     spec = (model_spec or settings.model) if method.uses_model else None
     out = Path(out_dir or run_dir(dataset, split, method_name, spec))
@@ -352,6 +381,123 @@ def write_items_csv(path: Path, rows: list[dict], method: str) -> None:
             writer.writerow(out)
 
 
+def _aligned(runs: list[tuple[dict, list[dict]]]) -> tuple[list[str], dict[str, dict[str, dict]]]:
+    """Item ids scored by every run (in a fixed order), and each run's rows by id."""
+    by_run = {f"{s['method']}|{s['model']}": {r["id"]: r for r in rows if r["old_score"] is not None}
+              for s, rows in runs}
+    common = set.intersection(*(set(v) for v in by_run.values())) if by_run else set()
+    return sorted(common), by_run
+
+
+def compare_table(runs: list[tuple[dict, list[dict]]], baseline: str) -> str:
+    """Each method's score with a 95% interval, and a paired comparison with ``baseline``.
+
+    Only items every run scored are used, in the same order for every run, so
+    each comparison is paired. Scores count deletions as failures.
+    """
+    from . import stats
+    ids, by_run = _aligned(runs)
+    keys = sorted(by_run, key=lambda k: (k.split("|")[0] != "noop", k))
+    base_key = next((k for k in keys if k.split("|")[0] == baseline), None)
+    head = (f"| Method | Model | Items | Score (deletions = failures) | 95% interval | vs {baseline} "
+            "| 95% interval of the difference | Resolved here, not there / there, not here | Sign test p |")
+    lines = [head, "|" + "---|" * 9]
+    for key in keys:
+        method, model = key.split("|")
+        rows = [by_run[key][i] for i in ids]
+        score = stats.score_decrease(rows)
+        low, high = stats.bootstrap_interval(rows)
+        if base_key is None or key == base_key:
+            rest = "| - | - | - | - |"
+        else:
+            base = [by_run[base_key][i] for i in ids]
+            diff, dlow, dhigh = stats.paired_difference(rows, base)
+            wins, losses = stats.paired_flips(rows, base)
+            rest = f"| {diff:+.2f} | {dlow:+.2f} to {dhigh:+.2f} | {wins} / {losses} | {stats.sign_test(wins, losses):.2f} |"
+        lines.append(f"| {method} | {model.split(':')[-1] if model != 'None' else '-'} | {len(rows)} | {score:.2f} "
+                     f"| {low:.2f} to {high:.2f} {rest}")
+    return "\n".join(lines)
+
+
+def cost_table(runs: list[tuple[dict, list[dict]]]) -> str:
+    """What each method costs per page: model calls, tokens, time, and money on a paid plan."""
+    lines = ["| Method | Model | Model calls per item | Tokens per item | Model time per item (median) "
+             "| Wall time per item (median / 90th percentile) | Replies from the cache | Paid plan, per 100 pages |",
+             "|" + "---|" * 8]
+    for s, rows in sorted(runs, key=lambda r: (r[0]["method"] != "noop", r[0]["method"], r[0]["model"] or "")):
+        if not rows:
+            continue
+        n = len(rows)
+        calls = sum(r["calls"] for r in rows)
+        cached = sum(r.get("cached_calls", 0) for r in rows)
+        walls = sorted(r["seconds"] for r in rows)
+        p90 = walls[min(n - 1, int(0.9 * n))]
+        price = PRICES.get(s["model"] or "")
+        cost = "-" if not price else \
+            f"${100 * sum(r['input_tokens'] * price[0] + r['output_tokens'] * price[1] for r in rows) / 1e6 / n:.2f}"
+        lines.append(f"| {s['method']} | {(s['model'] or '-').split(':')[-1]} | {calls / n:.1f} "
+                     f"| {round(sum(r['input_tokens'] + r['output_tokens'] for r in rows) / n):,} "
+                     f"| {statistics.median(r['model_seconds'] for r in rows):.1f} s "
+                     f"| {statistics.median(walls):.1f} s / {p90:.1f} s | {cached}/{calls} | {cost} |")
+    return "\n".join(lines)
+
+
+FAILURE_KINDS = {
+    "blocked": "blocked at the input screen",
+    "too_large": "request too large to send",
+    "deleted": "deleted content",
+    "broke": "fixed the target but broke another rule",
+    "guard": "every attempt rejected by the guardrails",
+    "no_match": "edits did not match the page",
+    "unusable": "no usable reply",
+    "still_fails": "the target still fails",
+    "partial": "fixed some of the failing elements",
+}
+
+
+def failure_kind(row: dict) -> str:
+    """Why an item was not resolved, from its outcome and (for the agent) the last steps of its trace."""
+    steps = [line for line in (row.get("response") or "").splitlines()
+             if line.startswith(("propose:", "guard:", "verify:"))]
+    last = steps[-1] if steps else ""
+    if row["status"] == "blocked":
+        return "blocked"
+    if row["status"] == "too_large":
+        return "too_large"
+    if row.get("dropped_content"):
+        return "deleted"
+    if row.get("target_fixed") and row.get("introduced"):
+        return "broke"
+    if row["new_score"] is not None and row["old_score"] and row["new_score"] < row["old_score"]:
+        return "partial"
+    if last.startswith("guard:"):
+        return "guard"
+    if "could not be applied" in last or "did not change the HTML" in last:
+        return "no_match"
+    if "required format" in last or "unusable reply" in last or row["status"] in ("no_html", "truncated"):
+        return "unusable"
+    if "made another rule fail" in last:
+        return "broke"
+    return "still_fails"
+
+
+def failures_report(rows: list[dict], method: str, limit: int = 20) -> str:
+    """The failures of one run: how many of each kind, then the first ``limit`` with their last problem."""
+    failed = [r for r in rows if r["old_score"] is not None and not (r["resolved"] and not r.get("dropped_content"))]
+    kinds = Counter(failure_kind(r) for r in failed)
+    lines = [f"{len(failed)} of {sum(r['old_score'] is not None for r in rows)} items not resolved by {method}.", "",
+             "| Why | Items |", "|---|---|"]
+    lines += [f"| {FAILURE_KINDS[k]} | {n} |" for k, n in kinds.most_common()]
+    lines += ["", "| Item | Rule | Page-level | Why | Last step | Guardrails |", "|---|---|---|---|---|---|"]
+    for r in failed[:limit]:
+        steps = [l for l in (r.get("response") or "").splitlines() if l.startswith(("propose:", "guard:", "verify:"))]
+        last = re.sub(r"; tools: .*?…: ", ": ", steps[-1] if steps else r.get("note") or "")   # tool calls aside
+        last = re.sub(r"\s+", " ", last)[:220].replace("|", "/")
+        lines.append(f"| {r['id']} | {r['rule_id']} | {'yes' if r['page_level'] else 'no'} | "
+                     f"{FAILURE_KINDS[failure_kind(r)]} | {last} | {_guard_text(r.get('guard')) or '-'} |")
+    return "\n".join(lines)
+
+
 def common_subset(runs: list[tuple[dict, list[dict]]]) -> tuple[set[str], list[dict]]:
     """Re-score every run on the items that *all* runs attempted.
 
@@ -396,12 +542,21 @@ def report_by_model(runs: list[tuple[dict, list[dict]]]) -> str:
     return "\n\n".join(sections)
 
 
+def _shown(path: Path) -> str:
+    """A path relative to the repository when it is inside it."""
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate repair methods on the benchmark.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="run one method over a split")
-    run.add_argument("--method", required=True, choices=sorted(METHODS))
+    run.add_argument("--method", required=True, nargs="+", choices=sorted(METHODS),
+                     help="one or more methods, run one after another")
     run.add_argument("--dataset", default="accessguru", choices=["accessguru", "access"])
     run.add_argument("--split", default="dev", choices=["dev", "test"])
     run.add_argument("--model", help="provider:model (default: MODEL from .env)")
@@ -415,6 +570,21 @@ def main(argv: list[str] | None = None) -> int:
     rep.add_argument("--save", action="store_true", help="copy summaries to results/ (to commit)")
     rep.add_argument("--model", help="only runs with this provider:model")
 
+    cmp = sub.add_parser("compare", help="confidence intervals, paired tests against a baseline, cost and latency")
+    cmp.add_argument("--dataset", default="accessguru", choices=["accessguru", "access"])
+    cmp.add_argument("--split", default="dev", choices=["dev", "test"])
+    cmp.add_argument("--model", help="only runs with this provider:model (default: MODEL from .env)")
+    cmp.add_argument("--baseline", default="agent_tools", help="the method every other method is compared with")
+    cmp.add_argument("--save", action="store_true", help="write results/<dataset>-<split>/comparison.md")
+
+    fail = sub.add_parser("failures", help="why a method's items were not resolved (error analysis)")
+    fail.add_argument("--method", required=True, choices=sorted(METHODS))
+    fail.add_argument("--dataset", default="accessguru", choices=["accessguru", "access"])
+    fail.add_argument("--split", default="dev", choices=["dev", "test"])
+    fail.add_argument("--model", help="provider:model (default: MODEL from .env)")
+    fail.add_argument("-n", type=int, default=20, help="how many failures to list")
+    fail.add_argument("--save", action="store_true", help="write results/<dataset>-<split>/failures__<method>.md")
+
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
@@ -425,16 +595,60 @@ def main(argv: list[str] | None = None) -> int:
         items = load_split(args.dataset, args.split)
         if args.limit:
             items = items[: args.limit]
-        summary = asyncio.run(run_evaluation(args.method, items, dataset=args.dataset, split=args.split,
-                                             model_spec=args.model, concurrency=args.concurrency,
-                                             fresh=args.fresh))
-        print()
-        print(report_table([summary]))
-        if "stopped" in summary:
-            return 2
-        if not summary["complete"]:
+        summaries = []
+        for method in args.method:
+            summary = asyncio.run(run_evaluation(method, items, dataset=args.dataset, split=args.split,
+                                                 model_spec=args.model, concurrency=args.concurrency,
+                                                 fresh=args.fresh))
+            summaries.append(summary)
+            print()
+            if "stopped" in summary:
+                print(report_table(summaries))
+                return 2
+        print(report_table(summaries))
+        if not all(s["complete"] for s in summaries):
             print("\nSome items failed (see the ! lines above). Run the same command again to retry them.")
             return 1
+        return 0
+
+    if args.command in ("compare", "failures"):
+        model = args.model or settings.model
+        runs = [r for r in collect_runs(args.dataset, args.split) if r[0]["model"] in (model, None) and r[1]]
+        target = RESULTS_DIR / f"{args.dataset}-{args.split}"
+        if args.command == "failures":
+            run = next((r for r in runs if r[0]["method"] == args.method and r[0]["model"]), None) or \
+                next((r for r in runs if r[0]["method"] == args.method), None)
+            if run is None:
+                print(f"No {args.method} run with {model} on {args.dataset}/{args.split}.")
+                return 1
+            text = failures_report(run[1], args.method, args.n)
+            print(text)
+            if args.save:
+                target.mkdir(parents=True, exist_ok=True)
+                path = target / f"failures__{args.method}__{model_slug(run[0]['model'])}.md"
+                path.write_text(f"# Failures: {args.method} on {args.dataset} {args.split} ({model})\n\n"
+                                "Made with `python -m a11y_agent.evaluate failures --save`.\n\n" + text + "\n",
+                                encoding="utf-8")
+                print(f"\nSaved to {_shown(path)}")
+            return 0
+        if not runs:
+            print(f"No runs with {model} on {args.dataset}/{args.split}.")
+            return 1
+        versions = sorted({v for s, _ in runs for v in s.get("code_versions", [])})
+        mixed = [s["method"] for s, _ in runs if len(s.get("code_versions", [])) > 1]
+        text = (compare_table(runs, args.baseline) + "\n\nCost and speed:\n\n" + cost_table(runs)
+                + f"\n\nCode versions: {', '.join(versions) or 'not recorded'}"
+                + (f". Runs that mix versions (resumed after a code change): {', '.join(mixed)}" if mixed else "")
+                + ".")
+        print(text)
+        if args.save:
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "comparison.md").write_text(
+                f"# Comparison: {args.dataset} {args.split} ({model})\n\n"
+                "Made with `python -m a11y_agent.evaluate compare --save`. Items every run scored; deletions count "
+                f"as failures; 95% intervals from {10000:,} bootstrap resamples of the items (paired for differences); "
+                "sign test on items one method resolved and the other did not.\n\n" + text + "\n", encoding="utf-8")
+            print(f"\nSaved to {_shown(target / 'comparison.md')}")
         return 0
 
     all_runs = collect_runs(args.dataset, args.split)
@@ -459,7 +673,7 @@ def main(argv: list[str] | None = None) -> int:
             "*Deletions count as failures*: the same score, but a fix that removed more than a tenth of the "
             "content scores as no fix.\n\n"
             + table + "\n", encoding="utf-8")
-        print(f"\nSaved to {target.relative_to(ROOT)}")
+        print(f"\nSaved to {_shown(target)}")
     return 0
 
 

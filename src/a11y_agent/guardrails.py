@@ -346,25 +346,32 @@ def check_fix(before_html: str, after_html: str) -> list[GuardProblem]:
             "adds_url", f"Your change adds links or resources that were not in the page ({_quote(new_urls, 4)}). "
             "Do not add URLs.", _quote(new_urls, 4)))
 
-    broken = []
+    broken, how = [], []
     if after.stray_brackets > before.stray_brackets or after_html.count("<<") + after_html.count(">>") > \
             before_html.count("<<") + before_html.count(">>"):
         broken.append("stray \"<\" or \">\" left in the text (for example \"<</end>>\")")
+        how.append("the markers \"<<start>>\" and \"<<end>>\" go only in find, written exactly")
     opened = [n for n, c in (after.unbalanced - before.unbalanced).items() if c > 0]
     if opened:
-        broken.append(f"tags opened or closed without their pair: {', '.join(f'<{n}>' for n in sorted(opened))}")
+        tags = ", ".join(f"<{n}>" for n in sorted(opened))
+        broken.append(f"tags opened or closed without their pair: {tags}")
+        how.append(f"close every tag you open ({tags})")
     doubled = [n for n, c in after.document_tags.items() if c > max(1, before.document_tags[n])]
     if doubled:
-        broken.append(f"a second {', '.join(f'<{n}>' for n in sorted(doubled))}")
+        tags = ", ".join(f"<{n}>" for n in sorted(doubled))
+        broken.append(f"a second {tags}")
+        how.append(f"change the existing {tags} instead of adding another")
     if after.outside[0] and after.outside[0] != before.outside[0]:
         broken.append("content placed before <html>")
+        how.append("put new content right after the opening <body> tag, or right after the opening <html ...> tag "
+                   "if there is no <body>")
     if after.outside[1] and after.outside[1] != before.outside[1]:
         broken.append("content placed after </html>")
+        how.append("put new content right before </body> (or </html> if there is no </body>)")
     if broken:
         problems.append(GuardProblem(
-            "broken_markup", f"Your change leaves the HTML broken: {'; '.join(broken)}. Use exactly \"<<start>>\" "
-            "or \"<<end>>\" as find to add something at the beginning or end, keep new content inside the existing "
-            "document, and close every tag you open.", "; ".join(broken)))
+            "broken_markup", f"Your change leaves the HTML broken: {'; '.join(broken)}. To fix that: "
+            f"{'; '.join(how)}.", "; ".join(broken)))
     return problems
 
 

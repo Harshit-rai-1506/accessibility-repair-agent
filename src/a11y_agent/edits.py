@@ -38,6 +38,23 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 START, END = "<<start>>", "<<end>>"     # special "find" values: insert at the beginning / end of the HTML
 _ANCHOR = re.compile(r"<<\s*(?:start|end)\s*>>", re.I)
+# A mistyped anchor ("<<start>", "<</end>>") would be pasted into the page as stray text.
+_BROKEN_ANCHOR = re.compile(r"<<\s*/?\s*(?:start|end)\b[^<>\n]{0,3}>{0,2}|</?\s*(?:start|end)\s*>>", re.I)
+_DOC_START = re.compile(r"<html[\s>/]", re.I)
+_DOC_END = re.compile(r"</html\s*>", re.I)
+_NOT_CONTENT = re.compile(r"<!--.*?-->|<!doctype[^>]*>|<\?xml[^>]*\?>|\s+", re.I | re.S)
+
+
+def _starts_with_document(html: str) -> bool:
+    """True if the HTML begins with its <html> tag (only a doctype or comments before it)."""
+    match = _DOC_START.search(html)
+    return bool(match) and not _NOT_CONTENT.sub("", html[:match.start()])
+
+
+def _ends_with_document(html: str) -> bool:
+    """True if the HTML ends with </html> (nothing but comments after it)."""
+    ends = list(_DOC_END.finditer(html))
+    return bool(ends) and not _NOT_CONTENT.sub("", html[ends[-1].end():])
 
 
 class Edit(BaseModel):
@@ -190,6 +207,11 @@ def apply_edits(html: str, edits: list[Edit]) -> str:
     wrapped (``<main>`` ... ``</main>``) without guessing its last tag. A
     ``find`` that matches nowhere, or in several places, is reported back to
     the model with what to do instead.
+
+    Two things are refused because they put text outside the page or garbage
+    in it (both seen in the dev runs): ``<<start>>`` on HTML that begins with
+    its ``<html>`` tag (or ``<<end>>`` after ``</html>``), and a mistyped
+    anchor such as ``<<start>`` in the replacement.
     """
     result, problems = html, []
     for number, edit in enumerate(edits, start=1):
@@ -197,10 +219,26 @@ def apply_edits(html: str, edits: list[Edit]) -> str:
         # Models often repeat the anchor in the replacement ("<<start>>" -> "<<start>><main>"),
         # as if it were text being replaced. It never belongs in the page, so it is removed.
         replace = _ANCHOR.sub("", edit.replace)
+        broken = _BROKEN_ANCHOR.search(replace)
+        if broken:
+            problems.append(f'Edit {number}: the replace text contains "{broken.group(0)}", a mistyped "{START}" or '
+                            f'"{END}". Those markers belong only in find, written exactly; replace is just the new HTML.')
+            continue
         if anchor == START:
+            if _starts_with_document(result):
+                problems.append(f'Edit {number}: "{START}" would put your text before the <html> tag, outside the '
+                                "page. Put it inside instead: right after the opening <body> tag (find that tag and "
+                                "repeat it in replace, followed by your text), or right after the opening <html ...> "
+                                "tag if there is no <body>.")
+                continue
             result = replace + result
             continue
         if anchor == END:
+            if _ends_with_document(result):
+                problems.append(f'Edit {number}: "{END}" would put your text after </html>, outside the page. Put it '
+                                "right before </body> instead (find </body> and put your text in front of it), or "
+                                "before </html> if there is no </body>.")
+                continue
             result = result + replace
             continue
         if not edit.find.strip():
