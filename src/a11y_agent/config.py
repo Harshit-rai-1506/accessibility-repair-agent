@@ -52,6 +52,11 @@ class Settings:
     fallback_model: str = field(default_factory=lambda: _env("FALLBACK_MODEL", "groq:openai/gpt-oss-20b"))
     reasoning_effort: str = field(default_factory=lambda: _env("REASONING_EFFORT", "low"))
     max_retries: int = field(default_factory=lambda: int(_env("MAX_RETRIES", "5")))
+    # Phase 5: the prompt-injection classifier for the input guardrail ("none" = rules only).
+    # Used only when its provider's API key is set (GROQ_API_KEY for the default).
+    prompt_guard_model: str = field(default_factory=lambda: _env("PROMPT_GUARD_MODEL",
+                                                                 "groq:meta-llama/llama-prompt-guard-2-86m"))
+    prompt_guard_threshold: float = field(default_factory=lambda: float(_env("PROMPT_GUARD_THRESHOLD", "0.5")))
 
     def limits(self, spec: str | None = None) -> Limits:
         """Rate and size limits for the provider of ``spec`` ("provider:model").

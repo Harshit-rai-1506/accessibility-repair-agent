@@ -15,6 +15,10 @@ small interface is what makes the comparison fair: only the method changes.
                 server, and the model may call explain_rule and contrast_fix
     agent_rag   agent_tools plus retrieval over the WCAG documents (Phase 4): W3C
                 guidance in the prompt, and a search_wcag tool
+    agent_guarded  agent_tools plus guardrails (Phase 5): the page is screened for
+                prompt injection, every fix is checked before it is scanned, and
+                the final change is approved automatically with its review flags
+                recorded (no person is present in an evaluation)
 """
 
 from __future__ import annotations
@@ -54,6 +58,7 @@ class FixResult:
     response: str = ""                # the last raw reply, kept for error analysis
     passes: int = 1                   # how many attempts the method made
     note: str = ""
+    guard: dict | None = None         # guardrail rejections and flags (method agent_guarded)
 
 
 class Method(Protocol):
@@ -189,9 +194,13 @@ class AgentMethod:
         outcome = next((o for o in state.get("outcomes", []) if o["rule_id"] == item.rule_id), {})
         kind = outcome.get("status", "not_fixed")
         trace = "\n".join(f"{s['node']}: {s['detail']}" for s in state.get("steps", []))
-        status = {"fixed": "ok", "improved": "ok", "too_large": "too_large"}.get(kind, "no_improvement")
+        status = {"fixed": "ok", "improved": "ok", "too_large": "too_large", "blocked": "blocked"}.get(kind, "no_improvement")
         html = state["current_html"]          # the original, unless a fix (or partial progress) was kept
-        return FixResult(html=html, status=status, calls=calls, response=trace,
+        guard = None
+        if state.get("summary", {}).get("guardrails") is not None:
+            guard = {**state["summary"]["guardrails"], "log": (state.get("guard_log") or [])[:30],
+                     "screening": state.get("screening") or {}}
+        return FixResult(html=html, status=status, calls=calls, response=trace, guard=guard,
                          passes=outcome.get("attempts", 0), note=f"{kind} after {outcome.get('attempts', 0)} attempt(s)")
 
 
@@ -247,8 +256,33 @@ class AgentRagMethod(AgentToolsMethod):
         return context
 
 
+class AgentGuardedMethod(AgentToolsMethod):
+    """Method E (Phase 5): the MCP agent with guardrails on input, output and action.
+
+    Built on ``agent_tools`` (retrieval did not help on the dev set, Phase 4).
+    The prompts are the same as ``agent_tools``, so replies come from the cache
+    until a guardrail intervenes: any difference in the results is caused by a
+    guardrail. The classifier (Llama Prompt Guard 2) is used when its API key is
+    set; otherwise the input screen uses its rules only.
+    """
+    name = "agent_guarded"
+
+    def __init__(self):
+        super().__init__()
+        self._guardrails = None
+
+    def agent_context(self, ctx: FixContext):
+        from .guardrails import Guardrails, PromptGuard
+        context = super().agent_context(ctx)
+        if self._guardrails is None:          # one classifier client (and rate limiter) for the whole run
+            self._guardrails = Guardrails(prompt_guard=PromptGuard.from_settings(cache=ctx.model.cache),
+                                          approval="auto")
+        context.guard = self._guardrails
+        return context
+
+
 METHODS: dict[str, type] = {m.name: m for m in (NoOp, ZeroShot, AccessGuru, AgentMethod, AgentToolsMethod,
-                                                AgentRagMethod)}
+                                                AgentRagMethod, AgentGuardedMethod)}
 
 
 def get_method(name: str) -> Method:

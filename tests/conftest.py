@@ -25,3 +25,10 @@ def pytest_collection_modifyitems(config, items):
         for marker, is_missing in missing.items():
             if is_missing and marker in item.keywords:
                 item.add_marker(pytest.mark.skip(reason="resources missing: run python scripts/fetch_resources.py"))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_prompt_guard(monkeypatch):
+    """Tests never call the real prompt-injection classifier, even if GROQ_API_KEY is set here."""
+    from a11y_agent import guardrails
+    monkeypatch.setattr(guardrails.PromptGuard, "from_settings", classmethod(lambda cls, cache=None: None))

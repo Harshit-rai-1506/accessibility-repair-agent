@@ -310,13 +310,17 @@ Resources            OK    axe-core 4.12.1, benchmark 7 files, WCAG corpus 625 f
 Documents            OK    benchmark 305 + 171 rows, WCAG 581 pages, axe 105 rules
 Browser + scanner    OK    broken example: 12 rules violated (score 44); fixed example: 0
 Embeddings           OK    384 dimensions; related text scores higher (0.77 vs 0.69)
-MCP server           OK    6 tools over stdio: scan_html, scan_url, verify_fix, explain_rule, contrast_fix, search_wcag
+MCP server           OK    7 tools over stdio: scan_html, scan_url, verify_fix, explain_rule, contrast_fix, search_wcag, check_fix_safety
+Guardrails           OK    rules flag 5/6 injection examples; a fix that hides an image is rejected
 Model config         OK    MODEL=groq:openai/gpt-oss-120b; pacing: 25 requests/min, 7,000 tokens/min, 8,000 tokens/request
 Model call           OK    replied "ready" in 0.6 s
 Agent reply          OK    usable JSON edits (schema enforced by the provider): <img src="logo.png" alt="...">
+Prompt guard         OK    attack 1.00, harmless 0.00 (raw replies ...; meta-llama/llama-prompt-guard-2-86m)
 ```
 
-(The last two lines need your key; "Agent reply" was added in Phase 2.)
+(The model lines need your key; "Agent reply" was added in Phase 2. "Prompt
+guard", added in Phase 5, needs GROQ_API_KEY and says SKIP without it: the
+guardrails then use their rules only.)
 
 The **41 tests** cover the scoring rules (with hand-made scan results, no
 browser needed), the real scanner on both example pages, end-to-end fix

@@ -5,10 +5,11 @@ and **proves each fix worked by re-scanning the page**. Built with LangGraph,
 an MCP tool server, retrieval over the official WCAG documentation, and
 guardrails. Runs on free, open-weight models.
 
-> **Status:** Phases 0–4 are built and tested on Linux and Windows: setup,
+> **Status:** Phases 0–5 are built and tested on Linux and Windows: setup,
 > evaluation harness and baselines, the LangGraph agent, an MCP tool server
-> the agent uses as a client, and retrieval over the WCAG documents. Dev-set
-> results below; guardrails and human approval (Phase 5) are next. See the
+> the agent uses as a client, retrieval over the WCAG documents, and
+> guardrails with human approval. Dev-set results below; the guardrails' dev
+> run and the final test-set runs (Phase 6) are next. See the
 > [build plan](docs/PLAN.md).
 
 ## The problem
@@ -91,8 +92,11 @@ MCP server; the agent uses it as a client, and the model can call tools while
 it works ([docs/03-mcp-tools.md](docs/03-mcp-tools.md)). Before the first
 attempt on a rule, hybrid search (BM25 + local embeddings) over the W3C's
 WCAG documents puts the relevant techniques and failures in the prompt
-([docs/04-retrieval.md](docs/04-retrieval.md)). Guardrails and human approval
-come in Phase 5.
+([docs/04-retrieval.md](docs/04-retrieval.md)). Guardrails screen each page for
+prompt injection, reject fixes that remove or hide content, add scripts or
+break the markup (axe-core accepts `aria-hidden="true"` on an image as a fix
+for missing alt text), and pause the graph so a person approves the final
+diff ([docs/05-guardrails.md](docs/05-guardrails.md)).
 
 ## Quickstart
 
@@ -117,7 +121,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 177 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 225 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
@@ -148,7 +152,16 @@ python -m a11y_agent.retrieval eval                          # hit@k and MRR: ke
 python -m a11y_agent.agent examples/broken_page.html --rag   # the agent with W3C guidance in its prompts
 ```
 
-Run the evaluation (Phases 1–2):
+Guardrails and human approval (Phase 5):
+
+```bash
+python -m a11y_agent.guardrails screen examples/injection/attack-alt-text.html   # prompt-injection screen
+python -m a11y_agent.guardrails check examples/broken_page.html examples/fixed_page.html
+python -m a11y_agent.guardrails eval                          # attacks caught, false alarms on real pages
+python -m a11y_agent.agent examples/broken_page.html --tools --approve    # you approve, edit or reject the result
+```
+
+Run the evaluation (Phases 1–5):
 
 ```bash
 python -m a11y_agent.evaluate run --method noop              # harness check, no model, ~20 s
@@ -157,6 +170,7 @@ python -m a11y_agent.evaluate run --method accessguru        # dev split, ~350K 
 python -m a11y_agent.evaluate run --method agent             # dev split, roughly 60-120K tokens
 python -m a11y_agent.evaluate run --method agent_tools       # dev split, roughly 100-180K tokens
 python -m a11y_agent.evaluate run --method agent_rag         # dev split, agent_tools + retrieval
+python -m a11y_agent.evaluate run --method agent_guarded     # dev split, agent_tools + guardrails
 python -m a11y_agent.evaluate report                         # compare everything run so far
 ```
 
@@ -167,8 +181,9 @@ of your laptop: see [docs/01-evaluation.md](docs/01-evaluation.md#9-running-it).
 Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 [docs/01-evaluation.md](docs/01-evaluation.md) (evaluation),
 [docs/02-agent.md](docs/02-agent.md) (the LangGraph agent),
-[docs/03-mcp-tools.md](docs/03-mcp-tools.md) (MCP tools) and
-[docs/04-retrieval.md](docs/04-retrieval.md) (retrieval).
+[docs/03-mcp-tools.md](docs/03-mcp-tools.md) (MCP tools),
+[docs/04-retrieval.md](docs/04-retrieval.md) (retrieval) and
+[docs/05-guardrails.md](docs/05-guardrails.md) (guardrails and human approval).
 
 ## Roadmap
 
@@ -179,7 +194,7 @@ Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 | 2 | LangGraph agent: scan → fix → verify → retry, with state and checkpoints | Graphs, state, reducers, conditional edges, structured output, checkpoints | ✅ Done (0.68 vs zero-shot 0.60) |
 | 3 | MCP server exposing the scanner, fix checker, rule explanations and a contrast calculator; agent calls them as a client | MCP (tools, resources, prompts, stdio/HTTP), function calling | ✅ Done (0.78, best so far) |
 | 4 | Retrieval over WCAG Understanding docs and Techniques, as a graph node and an MCP tool | Chunking, embeddings, hybrid search, metadata filters, retrieval evaluation | ✅ Done (did not help on dev; kept as method D) |
-| 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | Planned |
+| 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | ✅ Built; dev run pending |
 | 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, reporting | Planned |
 
 Details, acceptance criteria and budget for each phase: [docs/PLAN.md](docs/PLAN.md).
@@ -195,7 +210,7 @@ src/a11y_agent/
     loaders.py     LangChain document loaders (BaseLoader): benchmark rows, WCAG pages, axe rules
     benchmark.py   reproducible rows and the fixed dev/test split
     prompts.py     zero-shot and AccessGuru prompts; pulling HTML out of replies
-    methods.py     repair methods behind one interface (noop, zero_shot, accessguru, agent)
+    methods.py     repair methods behind one interface (noop, zero_shot, accessguru, agent, ..., agent_guarded)
     model_client.py  cached, rate-limited model calls; JSON-schema output; clean stops at the daily quota
     evaluate.py    the harness: scan, fix, re-scan, score, report
     agent.py       the LangGraph agent: state, nodes, conditional edges, checkpoints, CLI
@@ -203,17 +218,18 @@ src/a11y_agent/
     content.py     did a fix keep the page's words and elements?
     verification.py  one judgement of a fix, shared by the agent and the MCP tool
     contrast.py    WCAG contrast ratio and the closest colours that pass
-    mcp_server.py  the MCP server (FastMCP): scan, verify, explain, contrast tools; a resource; a prompt
+    mcp_server.py  the MCP server (FastMCP): scan, verify, explain, contrast, search, safety tools; a resource; a prompt
     mcp_client.py  starts the server and connects: a remote scanner and LangChain tools for the model
     retrieval.py   chunking, BM25 + dense hybrid search, criteria filters, retrieval evaluation
     embeddings.py  bge-small embeddings on the CPU (ONNX), cached; a test stand-in
+    guardrails.py  prompt-injection screen (rules + Llama Prompt Guard 2), checks on every fix, review flags
 scripts/
     fetch_resources.py   downloads pinned, checksum-verified resources into data/
     check_setup.py       tells you exactly what is missing
     try_mcp.py           a tiny MCP client: see the server's tools in action
 splits/            the dev/test split (row ids), made once and committed
 results/           evaluation summaries, committed after each run (runs/ holds the full, ignored, output)
-examples/          a broken page (12 violated rules) and its hand-fixed version (0)
+examples/          a broken page (12 violated rules), its hand-fixed version (0), and injection/ test pages
 tests/             pytest suite, run on Linux and Windows by GitHub Actions
 docs/              build plan and one explanatory guide per phase
 ```

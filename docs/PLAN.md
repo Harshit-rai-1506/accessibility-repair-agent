@@ -304,7 +304,7 @@ losses are the agent's mechanical failures taking a different path, and a
 the final comparison. Before the test run: one passage per page in the
 guidance (duplicates seen), not tuned on dev.
 
-### Phase 5: Guardrails and human approval (about 3–4 hours)
+### Phase 5: Guardrails and human approval ✅ built
 
 **Build**
 - *Input:* token budget per page; screen page text for prompt injection with
@@ -324,6 +324,31 @@ guidance (duplicates seen), not tuned on dev.
 prompt injection, reward hacking (fixing the metric instead of the page),
 human-in-the-loop.
 **Done when:** method E is measured with a rejection table.
+
+**Built** (27 Oct)
+- `guardrails.py`, three nodes in the graph: `screen` (input: nine injection
+  patterns over text, comments, alt/aria-label/title values and meta content,
+  plus Llama Prompt Guard 2 86M on Groq when GROQ_API_KEY is set, pieces of
+  1,200 characters, threshold 0.5), `guard` (output: rejects removes_content,
+  hides_content, empties_control, active_content, adds_url, broken_markup,
+  comparing before and after), `approve` (action: score never increases;
+  review flags; LangGraph `interrupt` with `--approve`, `Command(resume=...)`;
+  approve, edit or reject).
+- Why, measured: axe-core accepts `aria-hidden="true"`, `role="presentation"`,
+  `alt=""`, `display:none` and deletion as complete fixes for `image-alt`; the
+  Phase 4 runs accepted a fix ending in `<</end>>`.
+- Rules on 50 pages: 5/6 attacks (the paraphrase is missed), 1/4 benign
+  examples (an article quoting an attack), 0/40 dev pages.
+- Method E `agent_guarded` (agent_tools + guardrails: same prompts, so the
+  cache isolates the guardrails' effect); report table of blocked pages,
+  rejections by reason and flags by kind; MCP tool `check_fix_safety`;
+  setup check lines "Guardrails" and "Prompt guard".
+- `scan_url` now checks every request and redirect against the public-address rule (SSRF).
+- Guide: [docs/05-guardrails.md](05-guardrails.md). 225 tests.
+- *Remaining:* the dev run of `agent_guarded` and `guardrails eval --save`
+  with the classifier (needs the user's keys).
+- *Not done, noted:* a browser-rendered check of visible text (CSS classes
+  that hide text are only caught by their usual names).
 
 ### Phase 6: Results and write-up (about 3 hours + run time)
 

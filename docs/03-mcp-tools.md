@@ -104,8 +104,9 @@ Things worth copying into any tool server:
 - `scan_html` loads HTML with the network blocked (as since Phase 0).
 - `scan_url` accepts only public http(s) addresses: a host that resolves to
   this machine or the local network is refused, so the server cannot be used
-  to probe internal services ("server-side request forgery"). Redirects are
-  not re-checked yet; Phase 5 tightens network guardrails.
+  to probe internal services ("server-side request forgery"). Since Phase 5
+  the same check applies to every request the page makes and every redirect
+  (docs/05-guardrails.md §7).
 - Inputs over 2 million characters are refused.
 - In HTTP mode the server listens on `127.0.0.1` only, and the SDK's
   DNS-rebinding protection is on.

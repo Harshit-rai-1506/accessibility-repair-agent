@@ -25,6 +25,7 @@ import re
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from urllib.parse import urljoin
 
 from playwright.async_api import Browser, Playwright, async_playwright
 
@@ -128,6 +129,10 @@ class ScanResult:
         return cls(violations=violations, axe_version=raw.get("version", "unknown"))
 
 
+class BlockedRequest(Exception):
+    """A page asked for an address the scan is not allowed to reach (see ``Scanner.scan_url``)."""
+
+
 class Scanner:
     """Keeps one Chromium browser open and scans many pages with it.
 
@@ -180,15 +185,49 @@ class Scanner:
         finally:
             await context.close()
 
-    async def scan_url(self, url: str) -> ScanResult:
-        """Scan a live web page (network allowed, since we must load it)."""
+    async def scan_url(self, url: str, *, allow_url=None) -> ScanResult:
+        """Scan a live web page (network allowed, since we must load it).
+
+        ``allow_url(url) -> bool``, if given, is asked about every request the
+        page makes *and every redirect*: a refused one is blocked and the scan
+        fails with ``BlockedRequest``. The MCP server passes its "public
+        addresses only" check, so a public page cannot redirect the server to
+        this machine or the local network. (Chromium follows redirects without
+        asking, so each request is fetched with redirects off, the target
+        checked, and the redirect handed back to the browser.)
+        """
         if self._browser is None:
             raise RuntimeError("use 'async with Scanner() as scanner:'")
         context = await self._browser.new_context()
+        blocked: list[str] = []
         try:
             page = await context.new_page()
             page.set_default_timeout(self._timeout_ms)
-            await page.goto(url, wait_until="load")
+            if allow_url is not None:
+                async def check(route):
+                    request_url = route.request.url
+                    if request_url.startswith(("data:", "blob:")):
+                        return await route.continue_()
+                    if not allow_url(request_url):
+                        blocked.append(request_url)
+                        return await route.abort("blockedbyclient")
+                    response = await route.fetch(max_redirects=0)
+                    location = response.headers.get("location")
+                    if 300 <= response.status < 400 and location:
+                        target = urljoin(request_url, location)
+                        if not allow_url(target):
+                            blocked.append(target)
+                            return await route.abort("blockedbyclient")
+                    await route.fulfill(response=response)
+                await page.route("**/*", check)
+            try:
+                await page.goto(url, wait_until="load")
+            except Exception as error:
+                if blocked:
+                    raise BlockedRequest(f"blocked a request to {blocked[0]}") from error
+                raise
+            if blocked and page.url in blocked:
+                raise BlockedRequest(f"blocked a request to {blocked[0]}")
             return await self._run_axe(page)
         finally:
             await context.close()

@@ -52,3 +52,55 @@ def test_snippet_scan_and_network_blocked():
             return await scanner.scan_html('<img src="https://example.com/cat.png">')
     result = asyncio.run(run())
     assert "image-alt" in result.rule_ids
+
+
+def test_scan_url_checks_every_redirect():
+    """A page on an allowed server redirects to a forbidden one: the scan stops before reaching it."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from urllib.parse import urlparse
+
+    from a11y_agent.scanner import BlockedRequest, Scanner
+
+    hits = []
+
+    class Allowed(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/start":
+                self.send_response(302)
+                self.send_header("Location", f"http://127.0.0.1:{forbidden.server_port}/secret")
+                self.end_headers()
+                return
+            body = b'<!doctype html><html lang="en"><head><title>T</title></head><body><main><h1>T</h1>' \
+                   b'<img src="/cat.png"></main></body></html>'
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    class Forbidden(Allowed):
+        def do_GET(self):
+            hits.append(self.path)
+            super().do_GET()
+
+    allowed, forbidden = ThreadingHTTPServer(("127.0.0.1", 0), Allowed), ThreadingHTTPServer(("127.0.0.1", 0), Forbidden)
+    for server in (allowed, forbidden):
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    only_allowed = lambda url: urlparse(url).port == allowed.server_port
+
+    async def go():
+        async with Scanner() as scanner:
+            ok = await scanner.scan_url(f"http://127.0.0.1:{allowed.server_port}/page", allow_url=only_allowed)
+            with pytest.raises(BlockedRequest, match="/secret"):
+                await scanner.scan_url(f"http://127.0.0.1:{allowed.server_port}/start", allow_url=only_allowed)
+            return ok
+    try:
+        ok = asyncio.run(go())
+    finally:
+        allowed.shutdown()
+        forbidden.shutdown()
+    assert "image-alt" in ok.rule_ids                # pages still load and scan with the check on
+    assert hits == []                                # the forbidden server was never contacted

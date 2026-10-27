@@ -50,7 +50,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from .contrast import ColorError, suggest_colors
-from .scanner import ScanResult, Scanner
+from .scanner import BlockedRequest, ScanResult, Scanner
 from .scoring import violation_score
 from .verification import judge_fix
 
@@ -92,7 +92,8 @@ mcp = FastMCP(
     "accessibility-repair",
     instructions=("Tools for finding and fixing web accessibility (WCAG) problems in HTML with axe-core. "
                   "Typical use: scan_html to find violations, explain_rule to understand one, contrast_fix "
-                  "for colour problems, then verify_fix to check a corrected version."),
+                  "for colour problems, then verify_fix (scanner) and check_fix_safety (guardrails) to check a "
+                  "corrected version."),
     lifespan=lifespan,
     log_level="WARNING",                 # logs go to stderr; keep them to problems only
 )
@@ -180,8 +181,9 @@ def _check_public_url(url: str) -> None:
     """Only public http(s) pages: never this machine or the local network.
 
     Without this, anyone who can reach the server could make it load internal
-    addresses (server-side request forgery). Redirects after the first
-    request are not checked here; Phase 5 adds stricter network guardrails.
+    addresses (server-side request forgery). The same check is applied to
+    every request the page makes and every redirect (``scan_url`` passes
+    ``_is_public_url`` to the scanner), so a public page cannot redirect there.
     """
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
@@ -194,6 +196,16 @@ def _check_public_url(url: str) -> None:
         ip = ipaddress.ip_address(address.split("%")[0])
         if not ip.is_global:
             raise ValueError(f"{parsed.hostname} resolves to a private or local address ({ip}); only public pages can be scanned.")
+
+
+@lru_cache(maxsize=256)
+def _is_public_url(url: str) -> bool:
+    """True if ``url`` is an http(s) address on the public internet (asked for every request and redirect)."""
+    try:
+        _check_public_url(url)
+        return True
+    except ValueError:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +265,11 @@ async def scan_url(
     """Load a public web page in a headless browser and check it for accessibility violations."""
     _check_public_url(url)
     scanner = await _state(ctx).get_scanner()
-    return report_from_scan(await scanner.scan_url(url), max_nodes)
+    try:
+        result = await scanner.scan_url(url, allow_url=_is_public_url)
+    except BlockedRequest as e:
+        raise ValueError(f"The page tried to reach a private or local address, so the scan was stopped ({e}).")
+    return report_from_scan(result, max_nodes)
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -334,6 +350,40 @@ async def search_wcag(
     index = await asyncio.to_thread(shared_index)        # built on first use (embeddings are cached)
     hits = index.search(query, k, criteria=success_criteria or None, doc_types=tuple(page_types) or None)
     return SearchResults(passages=[Passage(**h.as_dict()) for h in hits])
+
+
+class SafetyItem(BaseModel):
+    code: str = Field(description="e.g. removes_content, hides_content, active_content, adds_url, broken_markup; "
+                                  "or, for review flags, added_visible_text, added_text_alternative, ...")
+    message: str
+
+
+class SafetyReport(BaseModel):
+    passed: bool = Field(description="True if no guardrail objects to the change.")
+    problems: list[SafetyItem] = Field(description="Reasons to reject the change.")
+    review: list[SafetyItem] = Field(description="Things a person should check before keeping the change.")
+    injection: list[str] = Field(description="Text in the original that looks like instructions to an AI model.")
+
+
+@mcp.tool(annotations=READ_ONLY)
+def check_fix_safety(
+    original_html: Annotated[str, Field(description="The HTML before the fix.")],
+    fixed_html: Annotated[str, Field(description="The HTML after the fix.")],
+) -> SafetyReport:
+    """The guardrails' view of a fix: does it remove or hide content, add scripts or URLs, or break the markup?
+
+    Also lists what a person should review (text the fix wrote, colours it changed, ...) and any text in the
+    original that looks like a prompt injection. Use it next to verify_fix: verify_fix asks the scanner,
+    this asks the guardrails. No browser and no model: fast and deterministic.
+    """
+    from .guardrails import check_fix, page_texts, review_flags, screen_with_rules
+    _check_html(original_html, "original_html")
+    _check_html(fixed_html, "fixed_html")
+    problems = check_fix(original_html, fixed_html)
+    return SafetyReport(passed=not problems,
+                        problems=[SafetyItem(code=p.code, message=p.message) for p in problems],
+                        review=[SafetyItem(code=f.code, message=f.message) for f in review_flags(original_html, fixed_html)],
+                        injection=[f"{f.reason} in {f.where}: {f.excerpt}" for f in screen_with_rules(page_texts(original_html))])
 
 
 @mcp.resource("axe-rule://{rule_id}", mime_type="text/plain")

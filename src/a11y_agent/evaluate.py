@@ -112,6 +112,7 @@ async def evaluate_item(item: BenchmarkItem, method, scanner: Scanner, model: Mo
         "model_seconds": round(sum(c.seconds for c in result.calls), 2),
         "seconds": round(time.perf_counter() - started, 2),
         "note": result.note,
+        "guard": result.guard,
         "fixed_html": result.html,
         "response": result.response,
     }
@@ -159,6 +160,20 @@ def summarize_rows(rows: list[dict], *, method: str, model: str | None, dataset:
         "axe_version": settings.axe_version,
     }
     summary["tokens_per_item"] = round((summary["input_tokens"] + summary["output_tokens"]) / max(len(rows), 1))
+    guarded = [r["guard"] for r in rows if r.get("guard")]
+    if guarded:
+        rejections, flags = Counter(), Counter()
+        for g in guarded:
+            rejections.update(g.get("rejected") or {})
+            flags.update(g.get("flagged") or {})
+        summary["guardrails"] = {
+            "items": len(guarded),
+            "blocked": sum(bool(g.get("blocked")) for g in guarded),
+            "items_with_rejections": sum(bool(g.get("rejected")) for g in guarded),
+            "rejections": dict(rejections.most_common()),
+            "items_flagged": sum(bool(g.get("flagged")) for g in guarded),
+            "flags": dict(flags.most_common()),
+        }
     return summary
 
 
@@ -270,6 +285,22 @@ def report_table(summaries: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def guard_table(summaries: list[dict]) -> str:
+    """Guardrail statistics for the runs that used them: what was stopped, rejected and flagged."""
+    lines = ["| Method | Model | Pages blocked at input | Items with a rejected attempt | Rejected attempts by reason "
+             "| Changes flagged for review | Flags by kind |", "|" + "---|" * 7]
+    for s in summaries:
+        g = s.get("guardrails")
+        if not g:
+            continue
+        reasons = ", ".join(f"{k} {v}" for k, v in g["rejections"].items()) or "none"
+        flags = ", ".join(f"{k} {v}" for k, v in g["flags"].items()) or "none"
+        lines.append(f"| {s['method']} | {(s['model'] or '-').split(':')[-1]} | {g['blocked']}/{g['items']} "
+                     f"| {g['items_with_rejections']}/{g['items']} | {reasons} | {g['items_flagged']}/{g['items']} "
+                     f"| {flags} |")
+    return "\n".join(lines) if len(lines) > 2 else ""
+
+
 def collect_runs(dataset: str, split: str) -> list[tuple[dict, list[dict]]]:
     """(summary, rows) for every run of a split."""
     base = settings.runs_dir / f"{dataset}-{split}"
@@ -289,7 +320,19 @@ def collect_runs(dataset: str, split: str) -> list[tuple[dict, list[dict]]]:
 
 ITEM_COLUMNS = ["id", "rule_id", "category", "page_level", "status", "old_score", "new_score", "target_fixed",
                 "resolved", "introduced", "dropped_content", "text_kept", "elements_kept", "passes", "calls",
-                "input_tokens", "output_tokens", "note", "trace"]
+                "input_tokens", "output_tokens", "note", "guard", "trace"]
+
+
+def _guard_text(guard: dict | None) -> str:
+    """One readable cell: "blocked; rejected removes_content 1; flagged added_visible_text 1"."""
+    if not guard:
+        return ""
+    parts = ["blocked"] if guard.get("blocked") else []
+    if guard.get("rejected"):
+        parts.append("rejected " + ", ".join(f"{k} {v}" for k, v in guard["rejected"].items()))
+    if guard.get("flagged"):
+        parts.append("flagged " + ", ".join(f"{k} {v}" for k, v in guard["flagged"].items()))
+    return "; ".join(parts) or "no objections"
 
 
 def write_items_csv(path: Path, rows: list[dict], method: str) -> None:
@@ -302,8 +345,9 @@ def write_items_csv(path: Path, rows: list[dict], method: str) -> None:
         writer = csv.DictWriter(f, fieldnames=ITEM_COLUMNS)
         writer.writeheader()
         for row in rows:
-            out = {k: row.get(k) for k in ITEM_COLUMNS if k not in ("introduced", "trace")}
+            out = {k: row.get(k) for k in ITEM_COLUMNS if k not in ("introduced", "trace", "guard")}
             out["introduced"] = ";".join(row.get("introduced") or [])
+            out["guard"] = _guard_text(row.get("guard"))
             out["trace"] = (row.get("response") or "")[:3000] if method.startswith("agent") else ""
             writer.writerow(out)
 
@@ -345,6 +389,9 @@ def report_by_model(runs: list[tuple[dict, list[dict]]]) -> str:
             common, common_summaries = common_subset(group)
             text += (f"\n\nOnly the {len(common)} items every run could send "
                      "(the fairest comparison when some requests were too large):\n\n" + report_table(common_summaries))
+        guards = guard_table(summaries)
+        if guards:
+            text += "\n\nGuardrails (Phase 5): what they stopped, rejected and flagged:\n\n" + guards
         sections.append(text)
     return "\n\n".join(sections)
 

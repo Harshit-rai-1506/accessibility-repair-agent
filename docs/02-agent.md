@@ -71,23 +71,31 @@ config:
 graph TD;
 	__start__([<p>__start__</p>]):::first
 	scan(scan)
+	screen(screen)
 	pick(pick)
 	retrieve(retrieve)
 	propose(propose)
+	guard(guard)
 	verify(verify)
 	accept(accept)
 	give_up(give_up)
+	approve(approve)
 	report(report)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> scan;
 	accept --> pick;
+	approve --> report;
 	give_up --> pick;
-	pick -. &nbsp;all done&nbsp; .-> report;
+	guard -. &nbsp;give up&nbsp; .-> give_up;
+	guard -. &nbsp;retry&nbsp; .-> propose;
+	guard -. &nbsp;passed&nbsp; .-> verify;
+	pick -. &nbsp;all done&nbsp; .-> approve;
 	pick -. &nbsp;next rule&nbsp; .-> retrieve;
 	propose -. &nbsp;give up&nbsp; .-> give_up;
-	propose -. &nbsp;edits applied&nbsp; .-> verify;
+	propose -. &nbsp;edits applied&nbsp; .-> guard;
 	retrieve --> propose;
-	scan --> pick;
+	scan --> screen;
+	screen --> pick;
 	verify -. &nbsp;passed&nbsp; .-> accept;
 	verify -. &nbsp;give up&nbsp; .-> give_up;
 	verify -. &nbsp;retry&nbsp; .-> propose;
@@ -107,7 +115,9 @@ In words, for a whole page:
 1. **scan** the page once; queue every violated rule, most severe first.
 2. **pick** the next rule (skipping rules an earlier fix already solved).
    (**retrieve**, added in Phase 4, then looks up W3C guidance for that rule
-   when a retriever is configured; otherwise it does nothing.)
+   when a retriever is configured; otherwise it does nothing. The Phase 5
+   guardrail steps **screen**, **guard** and **approve** likewise do nothing
+   unless guardrails are on: see docs/05-guardrails.md.)
 3. **propose**: ask the model for edits, apply them to a copy of the page.
 4. **verify**: scan the copy. Passed → **accept** it and go back to *pick*.
    Failed with attempts left → *propose* again, with the reason. Failed and

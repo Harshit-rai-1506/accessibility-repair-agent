@@ -19,7 +19,7 @@ on:
       method:
         description: Repair method
         type: choice
-        options: [agent, agent_tools, zero_shot, accessguru, noop]
+        options: [agent, agent_tools, agent_rag, agent_guarded, zero_shot, accessguru, noop]
         default: agent
       split:
         description: Benchmark split (use test only for final numbers)
@@ -87,7 +87,14 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Download resources
-        run: python scripts/fetch_resources.py --only axe benchmark axe-rules
+        shell: bash
+        run: |
+          # retrieval (agent_rag) also needs the WCAG documents and the embedding model
+          if [ "$METHOD" = "agent_rag" ]; then
+            python scripts/fetch_resources.py
+          else
+            python scripts/fetch_resources.py --only axe benchmark axe-rules wcag
+          fi
 
       - name: Restore earlier progress
         uses: actions/cache/restore@v6

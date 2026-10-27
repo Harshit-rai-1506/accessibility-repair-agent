@@ -3,9 +3,10 @@ and proves every fix by scanning again.
 
 The graph (``python -m a11y_agent.agent --graph`` prints it as Mermaid):
 
-    START -> scan -> pick
-    pick     --next rule-->      retrieve -> propose    or  --all done--> report -> END
-    propose  --edits applied-->  verify     or  --retry--> propose   or  --give up--> give_up
+    START -> scan -> screen -> pick
+    pick     --next rule-->      retrieve -> propose    or  --all done--> approve -> report -> END
+    propose  --edits applied-->  guard      or  --retry--> propose   or  --give up--> give_up
+    guard    --passed-->         verify     or  --retry--> propose   or  --give up--> give_up
     verify   --passed-->         accept     or  --retry--> propose   or  --give up--> give_up
     accept -> pick               give_up -> pick
 
@@ -28,6 +29,13 @@ What each part does:
 The model decides only *how* to fix a rule. *Whether* a fix worked is decided
 by axe-core and the content check, never by the model.
 
+Guardrails (Phase 5, ``guardrails.py``) are three of the nodes: ``screen``
+looks for instructions aimed at the model before the page reaches it,
+``guard`` rejects fixes that remove or hide content, add scripts or URLs, or
+break the markup, and ``approve`` pauses for a person to approve the final
+diff (``--approve``; LangGraph's ``interrupt``). Without guardrails in the
+runtime context the three do nothing, so the earlier methods are unchanged.
+
 Usage:
 
     python -m a11y_agent.agent examples/broken_page.html                 # fix every violation
@@ -35,6 +43,8 @@ Usage:
     python -m a11y_agent.agent page.html --thread my-page                # saved checkpoints: resume after a stop
     python -m a11y_agent.agent page.html --tools                         # as an MCP client, with model tools
     python -m a11y_agent.agent page.html --rag                           # ... plus WCAG guidance (Phase 4)
+    python -m a11y_agent.agent page.html --tools --guard                 # with guardrails (Phase 5)
+    python -m a11y_agent.agent page.html --tools --approve               # ... and a person approves the diff
     python -m a11y_agent.agent --graph                                   # print the graph (Mermaid)
 """
 
@@ -46,6 +56,7 @@ import contextlib
 import difflib
 import operator
 import sys
+from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Annotated, Any, TypedDict
@@ -53,6 +64,7 @@ from typing import Annotated, Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from langgraph.runtime import Runtime
+from langgraph.types import interrupt
 
 from .config import settings
 from .edits import (
@@ -78,6 +90,7 @@ from .model_client import (
     messages_tokens,
     tools_tokens,
 )
+from .guardrails import check_fix, review_flags
 from .prompts import agent_messages
 from .scanner import ScanResult, Scanner, Violation, ViolationNode
 from .scoring import impact_score
@@ -115,6 +128,7 @@ class AgentState(TypedDict, total=False):
     # Working state
     current_html: str             # the page with every accepted fix applied
     scan: dict                    # compact scan of current_html (see compact_scan)
+    initial_scan: dict            # the scan of the page as given (the approve step can go back to it)
     initial_score: int
     queue: list[str]              # rules still to fix, most severe first
     done_rules: list[str]         # rules already handled (fixed or not)
@@ -125,12 +139,15 @@ class AgentState(TypedDict, total=False):
     verdict: str                  # verify's decision: accept | retry | give_up
     stop_reason: str              # why the current rule cannot continue, e.g. "too_large"
     guidance: list[dict]          # WCAG passages retrieved for the current rule (Phase 4)
+    screening: dict               # the input guardrail's result (Phase 5)
+    approval: dict                # the approve step's decision and the flags it showed
     feedback: Annotated[list[dict], per_rule_log]     # what went wrong, shown to the model on retry
     candidates: Annotated[list[dict], per_rule_log]   # verified fixes for the current rule
     # Results (grow for the whole run)
     outcomes: Annotated[list[dict], operator.add]     # one entry per rule
     usage: Annotated[list[dict], operator.add]        # one entry per model call (tokens, seconds)
     steps: Annotated[list[dict], operator.add]        # the trace: one entry per node run
+    guard_log: Annotated[list[dict], operator.add]    # every guardrail rejection and review flag (Phase 5)
     summary: dict
 
 
@@ -150,6 +167,7 @@ class AgentContext:
     tools: list | None = None
     max_total_attempts: int = MAX_TOTAL_ATTEMPTS
     retriever: Any = None         # anything with async guidance(query, criteria, k) -> [passage]; None = no retrieval
+    guard: Any = None             # guardrails.Guardrails; None = no guardrails (Phase 5)
 
     def out_of_tries(self, attempt: int, stalls: int) -> bool:
         """Stop after ``max_attempts`` tries without progress, or ``max_total_attempts`` in all.
@@ -230,11 +248,46 @@ async def scan(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
     queue = queue[:limit]
     score = scan_score(current)
     return {
-        "current_html": state["html"], "scan": current, "initial_score": score, "queue": queue,
+        "current_html": state["html"], "scan": current, "initial_scan": current, "initial_score": score,
+        "queue": queue,
         "done_rules": [], "outcomes": outcomes,
         "steps": _step("scan", f"{detail}: {len(present)} rule(s) violated, score {score}; "
                                f"to fix: {', '.join(queue) or 'nothing'}"),
     }
+
+
+async def screen(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
+    """Input guardrail: look for instructions aimed at the model before any of the page reaches it.
+
+    If the page looks like an attack, no rule is sent to the model, unless a
+    person (``--approve``) decides to go ahead. Without guardrails: nothing.
+    """
+    guard = runtime.context.guard
+    if guard is None:
+        return {}
+    result = await guard.screen(state["html"])
+    update: dict = {"screening": result.as_dict(), "steps": _step("screen", result.describe())}
+    if not result.suspicious:
+        return update
+    if guard.approval == "ask":
+        answer = interrupt({"kind": "screen", "findings": result.as_dict()["findings"],
+                            "question": "This page contains text that looks like instructions to an AI model. "
+                                        "Send it to the model anyway?"})
+        if _decision(answer) in ("continue", "approve", "yes"):
+            update["steps"] += _step("screen", "a person allowed the page to be sent to the model")
+            return update
+    blocked = [{"rule_id": r, "status": "blocked", "attempts": 0, "reason": "prompt_injection"} for r in state["queue"]]
+    update.update(queue=[], outcomes=blocked,
+                  guard_log=[{"check": "prompt_injection", "kind": "blocked", "detail": result.describe()}])
+    update["steps"] += _step("screen", f"stopped: {len(blocked)} rule(s) not sent to the model")
+    return update
+
+
+def _decision(answer) -> str:
+    """A person's answer to an interrupt: a dict with "decision", or a plain string."""
+    if isinstance(answer, dict):
+        return str(answer.get("decision", "")).lower()
+    return str(answer or "").strip().lower()
 
 
 async def pick(state: AgentState) -> dict:
@@ -471,6 +524,32 @@ async def propose(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
                            attempt=attempt)}
 
 
+async def guard(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
+    """Output guardrail: check the proposed fix before the scanner sees it.
+
+    A fix that removes or hides content, adds scripts or URLs, or breaks the
+    markup is rejected; the reason goes back to the model like scanner
+    feedback, and the attempt counts. Without guardrails: nothing.
+    """
+    if runtime.context.guard is None:
+        return {}
+    rule, attempt, candidate = state["rule"], state["attempt"], state["candidate"]
+    problems = check_fix(state["current_html"], candidate["html"])
+    if not problems:
+        return {}
+    stalls = state.get("stalls", 0) + 1
+    verdict = "give_up" if runtime.context.out_of_tries(attempt, stalls) else "retry"
+    edits_text = describe_edits(candidate["edits"])
+    message = " ".join(p.message for p in problems) + repeated(state.get("feedback") or [], edits_text)
+    codes = ", ".join(p.code for p in problems)
+    return {"candidate": None, "verdict": verdict, "stalls": stalls,
+            "feedback": [{"attempt": attempt, "edits": edits_text, "problem": message}],
+            "guard_log": [{"check": p.code, "kind": "rejected", "rule": rule, "attempt": attempt, "detail": p.evidence}
+                          for p in problems],
+            "steps": _step("guard", f"rejected ({codes}): {'; '.join(p.evidence for p in problems)} -> {verdict}",
+                           rule=rule, attempt=attempt)}
+
+
 def repeated(feedback: list[dict], edits_text: str) -> str:
     """A note for the model if it proposed exactly the same edits as an earlier attempt."""
     same = [f["attempt"] for f in feedback if edits_text and f.get("edits") == edits_text]
@@ -566,6 +645,53 @@ async def give_up(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
             "outcomes": [outcome], "steps": _step("give_up", detail, rule=rule)}
 
 
+async def approve(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
+    """Action guardrail: the final diff is approved before it counts.
+
+    First an invariant: a page that scores worse than the one given is never
+    handed back. Then the review flags (text the model wrote, colours it
+    changed, ...). With ``approval="ask"`` the graph pauses here (``interrupt``)
+    until a person approves, edits or rejects the change; with "auto" (the
+    evaluation) it is approved and the flags are recorded. Without guardrails: nothing.
+    """
+    guard_rails = runtime.context.guard
+    if guard_rails is None:
+        return {}
+    original, final, update = state["html"], state["current_html"], {}
+    log: list[dict] = []
+    if scan_score(state["scan"]) > state["initial_score"]:
+        log.append({"check": "score_increase", "kind": "rejected",
+                    "detail": f"score {state['initial_score']} -> {scan_score(state['scan'])}: kept the original"})
+        update = {"current_html": original, "scan": state["initial_scan"]}
+        final = original
+    if final == original:
+        return {**update, "guard_log": log, "approval": {"decision": "nothing to approve", "flags": []},
+                "steps": _step("approve", "nothing changed, nothing to approve")}
+
+    flags = [asdict(f) for f in review_flags(original, final)]
+    log += [{"check": f["code"], "kind": "flagged", "detail": f["message"]} for f in flags]
+    codes = ", ".join(f["code"] for f in flags) or "nothing"
+    if guard_rails.approval != "ask":
+        return {"guard_log": log, "approval": {"decision": "auto", "flags": flags},
+                "steps": _step("approve", f"approved automatically; for a person to check: {codes}")}
+
+    answer = interrupt({"kind": "approve", "score": f"{state['initial_score']} -> {scan_score(state['scan'])}",
+                        "flags": flags, "diff": unified_diff(original, final, limit=200), "html": final})
+    decision = _decision(answer)
+    if decision == "reject":
+        return {"current_html": original, "scan": state["initial_scan"], "guard_log": log,
+                "approval": {"decision": "rejected", "flags": flags},
+                "steps": _step("approve", "a person rejected the change: the original page is kept")}
+    if decision == "edit" and isinstance(answer, dict) and answer.get("html"):
+        edited = answer["html"]
+        scanned = compact_scan(await runtime.context.scanner.scan_html(edited))
+        return {"current_html": edited, "scan": scanned, "guard_log": log,
+                "approval": {"decision": "edited", "flags": flags},
+                "steps": _step("approve", f"a person edited the change (score now {scan_score(scanned)})")}
+    return {"guard_log": log, "approval": {"decision": "approved", "flags": flags},
+            "steps": _step("approve", f"a person approved the change (flags shown: {codes})")}
+
+
 async def report(state: AgentState) -> dict:
     """Summarise the run: what was fixed, what was not, the score before and after."""
     final = scan_score(state["scan"])
@@ -576,6 +702,14 @@ async def report(state: AgentState) -> dict:
                "remaining_rules": _by_severity(state["scan"]),
                "model_calls": len(state.get("usage", [])),
                "tokens": sum(u["input_tokens"] + u["output_tokens"] for u in state.get("usage", []))}
+    if state.get("guard_log") or state.get("screening") or state.get("approval"):
+        log = state.get("guard_log") or []
+        summary["guardrails"] = {
+            "rejected": dict(Counter(e["check"] for e in log if e["kind"] == "rejected")),
+            "flagged": dict(Counter(e["check"] for e in log if e["kind"] == "flagged")),
+            "blocked": any(e["kind"] == "blocked" for e in log),
+            "approval": (state.get("approval") or {}).get("decision", ""),
+        }
     fixed = len(by_status.get("fixed", [])) + len(by_status.get("fixed_by_earlier_fix", []))
     return {"summary": summary,
             "steps": _step("report", f"score {state['initial_score']} -> {final}; {fixed} rule(s) fixed")}
@@ -598,6 +732,12 @@ def after_propose(state: AgentState) -> str:
     return "give up" if state["verdict"] == "give_up" else "retry"
 
 
+def after_guard(state: AgentState) -> str:
+    if state.get("candidate"):
+        return "passed"
+    return "give up" if state["verdict"] == "give_up" else "retry"
+
+
 def after_verify(state: AgentState) -> str:
     return {"accept": "passed", "retry": "retry"}.get(state["verdict"], "give up")
 
@@ -605,19 +745,24 @@ def after_verify(state: AgentState) -> str:
 def build_graph(checkpointer=None):
     """Assemble and compile the graph. Pass a checkpointer to save state after every step."""
     graph = StateGraph(AgentState, context_schema=AgentContext)
-    for name, fn in [("scan", scan), ("pick", pick), ("retrieve", retrieve), ("propose", propose),
-                     ("verify", verify), ("accept", accept), ("give_up", give_up), ("report", report)]:
+    for name, fn in [("scan", scan), ("screen", screen), ("pick", pick), ("retrieve", retrieve), ("propose", propose),
+                     ("guard", guard), ("verify", verify), ("accept", accept), ("give_up", give_up),
+                     ("approve", approve), ("report", report)]:
         graph.add_node(name, fn)
     graph.add_edge(START, "scan")
-    graph.add_edge("scan", "pick")
-    graph.add_conditional_edges("pick", after_pick, {"next rule": "retrieve", "all done": "report"})
+    graph.add_edge("scan", "screen")
+    graph.add_edge("screen", "pick")
+    graph.add_conditional_edges("pick", after_pick, {"next rule": "retrieve", "all done": "approve"})
     graph.add_edge("retrieve", "propose")
     graph.add_conditional_edges("propose", after_propose,
-                                {"edits applied": "verify", "retry": "propose", "give up": "give_up"})
+                                {"edits applied": "guard", "retry": "propose", "give up": "give_up"})
+    graph.add_conditional_edges("guard", after_guard,
+                                {"passed": "verify", "retry": "propose", "give up": "give_up"})
     graph.add_conditional_edges("verify", after_verify,
                                 {"passed": "accept", "retry": "propose", "give up": "give_up"})
     graph.add_edge("accept", "pick")
     graph.add_edge("give_up", "pick")
+    graph.add_edge("approve", "report")
     graph.add_edge("report", END)
     return graph.compile(checkpointer=checkpointer, name="accessibility-repair-agent")
 
@@ -626,9 +771,10 @@ def recursion_limit(max_attempts: int = MAX_ATTEMPTS, max_rules: int = MAX_RULES
                     max_total_attempts: int = MAX_TOTAL_ATTEMPTS) -> int:
     """LangGraph stops any run after this many steps: a second safety net behind the attempt limits.
 
-    Per rule: pick, retrieve, up to max_total_attempts x (propose + verify), accept or give_up.
+    Per rule: pick, retrieve, up to max_total_attempts x (propose + guard + verify), accept or give_up;
+    plus scan, screen, the last pick, approve and report.
     """
-    return 4 + max_rules * (2 * max(max_attempts, max_total_attempts) + 3)
+    return 6 + max_rules * (3 * max(max_attempts, max_total_attempts) + 3)
 
 
 def mermaid() -> str:
@@ -663,13 +809,79 @@ def unified_diff(before: str, after: str, limit: int = 80) -> str:
     return "\n".join(lines)
 
 
+def ask_person(pending: dict, review_path: Path) -> dict:
+    """Show what the graph paused for, and read the person's decision from the terminal.
+
+    Without a terminal to ask (input redirected), the safe answer is given:
+    stop, or keep the original page.
+    """
+    if pending.get("kind") == "screen":
+        print("\n" + pending["question"])
+        for f in pending["findings"][:5]:
+            print(f"  {f['source']}: {f['reason']} in {f['where']}: \"{f['excerpt']}\"")
+        if not sys.stdin.isatty():
+            print("(no terminal to ask: stopping)")
+            return {"decision": "stop"}
+        return {"decision": "continue" if input("Send it anyway? [y/N] ").strip().lower() in ("y", "yes") else "stop"}
+
+    print(f"\nReview the change before it is kept (violation score {pending['score']}):")
+    if pending["flags"]:
+        print("Things to check:")
+        for f in pending["flags"]:
+            print(f"  - {f['message']}")
+    print("\n" + pending["diff"])
+    if not sys.stdin.isatty():
+        print("(no terminal to ask: keeping the original page)")
+        return {"decision": "reject"}
+    while True:
+        choice = input("\n[a]pprove, [r]eject, or [e]dit it yourself? ").strip().lower()[:1]
+        if choice == "a":
+            return {"decision": "approve"}
+        if choice == "r":
+            return {"decision": "reject"}
+        if choice == "e":
+            review_path.write_text(pending["html"], encoding="utf-8")
+            input(f"Edit {review_path}, save it, then press Enter here... ")
+            return {"decision": "edit", "html": review_path.read_text(encoding="utf-8")}
+
+
+async def drive(graph, graph_input, config, context, *, on_interrupt) -> None:
+    """Run the graph, printing each step; when it pauses for a person, ask and resume.
+
+    ``interrupt()`` inside a node stops the run and saves it in the checkpoint;
+    running the graph again with ``Command(resume=answer)`` continues that node
+    with the answer. ``on_interrupt(payload) -> answer``.
+    """
+    from langgraph.types import Command
+    while True:
+        pending = None
+        async for update in graph.astream(graph_input, config, context=context, stream_mode="updates"):
+            if "__interrupt__" in update:
+                pending = update["__interrupt__"][0].value
+                continue
+            for node_update in update.values():
+                for step in (node_update or {}).get("steps", []):
+                    _print_step(step)
+        if pending is None:
+            return
+        graph_input = Command(resume=await asyncio.to_thread(on_interrupt, pending))
+
+
 async def _run_cli(args) -> int:
     from .model_client import ResponseCache, StopRun
 
     path = Path(args.file)
     html = path.read_text(encoding="utf-8")
     out = Path(args.out) if args.out else path.with_name(path.stem + ".fixed.html")
-    model = ModelClient(args.model, cache=ResponseCache(settings.runs_dir / "cache.sqlite"))
+    cache = ResponseCache(settings.runs_dir / "cache.sqlite")
+    model = ModelClient(args.model, cache=cache)
+    guardrails = None
+    if args.guard or args.approve:
+        from .guardrails import Guardrails, PromptGuard
+        prompt_guard = PromptGuard.from_settings(cache)
+        guardrails = Guardrails(prompt_guard=prompt_guard, approval="ask" if args.approve else "auto")
+        print("Guardrails on: input screen (" + (f"rules + {prompt_guard.spec}" if prompt_guard else "rules only")
+              + "), output checks, " + ("a person approves the result" if args.approve else "automatic approval"))
     config = run_config(thread_id=args.thread or "cli", max_attempts=args.max_attempts,
                         run_name=f"repair:{path.name}", metadata={"file": str(path)})
 
@@ -698,21 +910,23 @@ async def _run_cli(args) -> int:
             scanner, tools = await stack.enter_async_context(Scanner()), None
         graph = build_graph(checkpointer=saver)
         context = AgentContext(scanner=scanner, model=model, max_attempts=args.max_attempts, tools=tools,
-                               retriever=retriever)
+                               retriever=retriever, guard=guardrails)
         snapshot = await graph.aget_state(config)
+        review_path = out.with_name(out.stem + ".review.html")
         if args.thread and snapshot.next:
             print(f"Resuming thread '{args.thread}' (it stopped before: {', '.join(snapshot.next)})")
             graph_input = None
+            if snapshot.interrupts:               # it was waiting for a person: ask again
+                from langgraph.types import Command
+                graph_input = Command(resume=ask_person(snapshot.interrupts[0].value, review_path))
         else:
             if snapshot.values:                   # a finished run on this thread: start it over
                 await saver.adelete_thread(config["configurable"]["thread_id"])
             graph_input = {"html": html, "targets": args.rules or []}
         print(f"Repairing {path} with {model.spec} (up to {args.max_attempts} attempts per rule)")
         try:
-            async for update in graph.astream(graph_input, config, context=context, stream_mode="updates"):
-                for node_update in update.values():
-                    for step in (node_update or {}).get("steps", []):
-                        _print_step(step)
+            await drive(graph, graph_input, config, context,
+                        on_interrupt=lambda pending: ask_person(pending, review_path))
         except StopRun as e:
             print(f"\nStopped: {e}")
             if args.thread:
@@ -735,6 +949,12 @@ async def _run_cli(args) -> int:
           f"({s['model_calls']} model calls, about {s['tokens']} tokens)")
     for status, rules in s["by_status"].items():
         print(f"  {status:22} {', '.join(rules)}")
+    if s.get("guardrails"):
+        g = s["guardrails"]
+        rejected = ", ".join(f"{k} x{v}" for k, v in g["rejected"].items()) or "none"
+        print(f"  {'guardrail rejections':22} {rejected}" + ("; page blocked at the input screen" if g["blocked"] else ""))
+        if g["approval"]:
+            print(f"  {'approval':22} {g['approval']}")
     if s["remaining_rules"]:
         print(f"  {'still failing':22} {', '.join(s['remaining_rules'])}")
     diff = unified_diff(html, state["current_html"])
@@ -757,6 +977,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="run as an MCP client: scan on the MCP server and let the model call its tools")
     parser.add_argument("--rag", action="store_true",
                         help="like --tools, plus W3C guidance retrieved for each rule (Phase 4)")
+    parser.add_argument("--guard", action="store_true",
+                        help="guardrails: screen the page for prompt injection and check every fix (Phase 5)")
+    parser.add_argument("--approve", action="store_true",
+                        help="like --guard, and pause so you approve, edit or reject the final change")
     parser.add_argument("--graph", action="store_true", help="print the graph as a Mermaid diagram and exit")
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
