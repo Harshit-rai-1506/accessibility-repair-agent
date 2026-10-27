@@ -8,22 +8,32 @@
   "items_total": 40,
   "all": {
     "violations": 40,
-    "score_decrease": 0.637,
-    "resolved": 24,
-    "target_fixed": 26,
+    "score_decrease": 0.7603,
+    "resolved": 30,
+    "target_fixed": 32,
     "introduced_new_violations": 2,
     "avg_old_score": 3.65,
-    "avg_new_score": 1.325
+    "avg_new_score": 0.875
   },
   "deletions_fail": {
     "violations": 40,
-    "score_decrease": 0.637,
-    "resolved": 24,
-    "target_fixed": 26,
+    "score_decrease": 0.7603,
+    "resolved": 30,
+    "target_fixed": 32,
     "introduced_new_violations": 2,
     "avg_old_score": 3.65,
-    "avg_new_score": 1.325
+    "avg_new_score": 0.875
   },
+  "safe": {
+    "violations": 40,
+    "score_decrease": 0.7603,
+    "resolved": 30,
+    "target_fixed": 32,
+    "introduced_new_violations": 2,
+    "avg_old_score": 3.65,
+    "avg_new_score": 0.875
+  },
+  "unsafe_fixes": 0,
   "element_level": {
     "violations": 26,
     "score_decrease": 0.7212,
@@ -45,38 +55,42 @@
     },
     "Syntax": {
       "violations": 28,
-      "score_decrease": 0.5859,
-      "resolved": 15,
-      "target_fixed": 17,
+      "score_decrease": 0.7677,
+      "resolved": 21,
+      "target_fixed": 23,
       "introduced_new_violations": 2,
       "avg_old_score": 3.536,
-      "avg_new_score": 1.464
+      "avg_new_score": 0.821
     }
   },
   "status": {
-    "ok": 26,
-    "no_improvement": 14
+    "ok": 32,
+    "no_improvement": 8
   },
   "dropped_content": 0,
-  "calls": 173,
-  "input_tokens": 577887,
-  "output_tokens": 58769,
-  "model_seconds": 32.8,
-  "paid_cost_usd": 0.0126,
+  "calls": 165,
+  "input_tokens": 564705,
+  "output_tokens": 58646,
+  "model_seconds": 5.6,
+  "paid_cost_usd": 0.0024,
   "axe_version": "4.12.1",
-  "tokens_per_item": 15916,
+  "code_versions": [
+    "dd2e88d"
+  ],
+  "tokens_per_item": 15584,
   "guardrails": {
     "items": 40,
     "blocked": 0,
-    "items_with_rejections": 10,
+    "items_with_rejections": 3,
     "rejections": {
-      "broken_markup": 20
+      "broken_markup": 3
     },
-    "items_flagged": 26,
+    "items_flagged": 32,
     "flags": {
+      "adds_landmarks": 14,
       "changed_colours": 9,
       "added_text_alternative": 9,
-      "adds_landmarks": 8,
+      "added_visible_text": 3,
       "marked_decorative": 2,
       "sets_language": 1
     }

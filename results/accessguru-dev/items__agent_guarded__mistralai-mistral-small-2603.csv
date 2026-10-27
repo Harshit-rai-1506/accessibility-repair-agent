@@ -105,16 +105,14 @@ accept: fixed region in 1 attempt(s)
 pick: nothing left to fix
 approve: approved automatically; for a person to check: adds_landmarks
 report: score 17 -> 11; 1 rule(s) fixed"
-accessguru-056,region,Syntax,True,ok,3,0,True,True,,False,0.963,1.0,3,6,9794,772,fixed after 3 attempt(s),rejected broken_markup 2; flagged adds_landmarks 1,"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: region
+accessguru-056,region,Syntax,True,ok,3,0,True,True,,False,0.963,1.0,2,4,6182,483,fixed after 2 attempt(s),rejected broken_markup 1; flagged adds_landmarks 1,"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: region
 screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (1 piece(s) of text))
 pick: next rule: region
 propose: 1 edit(s); tools: explain_rule({'rule_id': 'region'}) -> axe-core rule: region All page content should be contained by landmarks. Ensure all page content is contained by landmarks. Impact: moderate. This is a best-pr…: ""Australian Breaking News Headlines &amp; World News Online | SMH.com.au</div>, <p>We’re sorry, this feature is currentl…"" -> ""Australian Breaking News Headlines &amp; World News Online | SMH.com.au</div> </main> <p>We’re sorry, this feature is c…""
 guard: rejected (broken_markup): tags opened or closed without their pair: <main> -> retry
-propose: 3 edit(s); tools: explain_rule({'rule_id': 'region'}) -> axe-core rule: region All page content should be contained by landmarks. Ensure all page content is contained by landmarks. Impact: moderate. This is a best-pr…: ""<<start>>"" -> ""<<start>><main>""; ""</div>, <p>We’re sorry, this feature is currently unavailable. We’re working to restore it. Please try again later.</p>"" -> ""</div></main> <p>We’re sorry, this feature is currently unavailable. We’re working to restore it. Please try again late…""; ""<<end>>"" -> ""</main><<end>>""
-guard: rejected (broken_markup): tags opened or closed without their pair: <main> -> retry
-propose: 3 edit(s); tools: explain_rule({'rule_id': 'region'}) -> axe-core rule: region All page content should be contained by landmarks. Ensure all page content is contained by landmarks. Impact: moderate. This is a best-pr…: ""<<start>>"" -> ""<<start>><main>""; ""</div>, <p>We’re sorry, this feature is currently unavailable. We’re working to restore it. Please try again later.</p>"" -> ""</div> <p>We’re sorry, this feature is currently unavailable. We’re working to restore it. Please try again later.</p>""; ""<<end>>"" -> ""</main><<end>>""
+propose: 3 edit(s); tools: explain_rule({'rule_id': 'region'}) -> axe-core rule: region All page content should be contained by landmarks. Ensure all page content is contained by landmarks. Impact: moderate. This is a best-pr…: ""<<start>>"" -> ""<<start>> <main>""; ""Australian Breaking News Headlines &amp; World News Online | SMH.com.au</div>, <p>We’re sorry, this feature is currentl…"" -> ""Australian Breaking News Headlines &amp; World News Online | SMH.com.au</div> <p>We’re sorry, this feature is currently…""; ""<<end>>"" -> ""</main> <<end>>""
 verify: passed -> accept
-accept: fixed region in 3 attempt(s)
+accept: fixed region in 2 attempt(s)
 pick: nothing left to fix
 approve: approved automatically; for a person to check: adds_landmarks
 report: score 17 -> 11; 1 rule(s) fixed"
@@ -127,12 +125,12 @@ accept: fixed region in 1 attempt(s)
 pick: nothing left to fix
 approve: approved automatically; for a person to check: adds_landmarks
 report: score 17 -> 11; 1 rule(s) fixed"
-accessguru-060,region,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,2,4,5962,336,fixed after 2 attempt(s),rejected broken_markup 1; flagged adds_landmarks 1,"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: region
+accessguru-060,region,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,2,4,5912,524,fixed after 2 attempt(s),rejected broken_markup 1; flagged adds_landmarks 1,"scan: reused the caller's scan: 5 rule(s) violated, score 17; to fix: region
 screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (1 piece(s) of text))
 pick: next rule: region
 propose: 2 edit(s); tools: explain_rule({'rule_id': 'region'}) -> axe-core rule: region All page content should be contained by landmarks. Ensure all page content is contained by landmarks. Impact: moderate. This is a best-pr…: ""<<start>>"" -> ""<<start>><main>""; ""<div class=""d-flex justify-content-center justify-content-sm-start""><span id=""session-counter"">27,949,318 sessions and …"" -> ""<main><div class=""d-flex justify-content-center justify-content-sm-start""><span id=""session-counter"">27,949,318 session…""
 guard: rejected (broken_markup): tags opened or closed without their pair: <main> -> retry
-propose: 2 edit(s); tools: explain_rule({'rule_id': 'region'}) -> axe-core rule: region All page content should be contained by landmarks. Ensure all page content is contained by landmarks. Impact: moderate. This is a best-pr…: ""<<start>>"" -> ""<<start>><main>""; ""</div>, <div class=""footer"">"" -> ""</main></div>, <div class=""footer"">""
+propose: 3 edit(s); tools: explain_rule({'rule_id': 'region'}) -> axe-core rule: region All page content should be contained by landmarks. Ensure all page content is contained by landmarks. Impact: moderate. This is a best-pr…: ""<<start>>"" -> ""<<start>><main>""; ""<div class=""d-flex justify-content-center justify-content-sm-start""><span id=""session-counter"">27,949,318 sessions and …"" -> ""<div class=""d-flex justify-content-center justify-content-sm-start""><span id=""session-counter"">27,949,318 sessions and …""; ""<<end>>"" -> ""</main><<end>>""
 verify: passed -> accept
 accept: fixed region in 2 attempt(s)
 pick: nothing left to fix
@@ -204,93 +202,83 @@ accept: fixed landmark-one-main in 1 attempt(s)
 pick: nothing left to fix
 approve: approved automatically; for a person to check: adds_landmarks
 report: score 10 -> 7; 1 rule(s) fixed"
-accessguru-121,landmark-one-main,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,6,9138,428,not_fixed after 3 attempt(s),rejected broken_markup 3,"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
+accessguru-121,landmark-one-main,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,1,2,2870,210,fixed after 1 attempt(s),flagged adds_landmarks 1,"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
 screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (0 piece(s) of text))
 pick: next rule: landmark-one-main
 propose: 2 edit(s); tools: explain_rule({'rule_id': 'landmark-one-main'}) -> axe-core rule: landmark-one-main Document should have one main landmark. Ensure the document has a main landmark. Impact: moderate. This is a best-practice rul…: ""<<start>>"" -> ""<<start>><main>""; ""<<end>>"" -> ""</main>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: 2 edit(s); tools: explain_rule({'rule_id': 'landmark-one-main'}) -> axe-core rule: landmark-one-main Document should have one main landmark. Ensure the document has a main landmark. Impact: moderate. This is a best-practice rul…: ""<<start>>"" -> ""<<start>><main>""; ""<<end>>"" -> ""</main><<end>>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: 2 edit(s); tools: explain_rule({'rule_id': 'landmark-one-main'}) -> axe-core rule: landmark-one-main Document should have one main landmark. Ensure the document has a main landmark. Impact: moderate. This is a best-practice rul…: ""<<start>>"" -> ""<<start>><main>""; ""<<end>>"" -> ""</main><<end>>""
-guard: rejected (broken_markup): content placed before <html> -> give_up
-give_up: left landmark-one-main unfixed (not_fixed)
+verify: passed -> accept
+accept: fixed landmark-one-main in 1 attempt(s)
 pick: nothing left to fix
-approve: nothing changed, nothing to approve
-report: score 10 -> 10; 0 rule(s) fixed"
-accessguru-122,landmark-one-main,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,6,9132,483,not_fixed after 3 attempt(s),rejected broken_markup 1,"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
+approve: approved automatically; for a person to check: adds_landmarks
+report: score 10 -> 7; 1 rule(s) fixed"
+accessguru-122,landmark-one-main,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,3,6,9132,483,fixed after 3 attempt(s),flagged adds_landmarks 1,"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
 screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (0 piece(s) of text))
 pick: next rule: landmark-one-main
 propose: edits could not be applied; tools: explain_rule({'rule_id': 'landmark-one-main'}) -> axe-core rule: landmark-one-main Document should have one main landmark. Ensure the document has a main landmark. Impact: moderate. This is a best-practice rul…: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown; the HTML may be a fragment, so tags such as </body> may not exist. To add something at the very beginning or end, use ""<<start>>"" or ""<<end>>"" as find.
 propose: edits could not be applied; tools: explain_rule({'rule_id': 'landmark-one-main'}) -> axe-core rule: landmark-one-main Document should have one main landmark. Ensure the document has a main landmark. Impact: moderate. This is a best-practice rul…: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown; the HTML may be a fragment, so tags such as </body> may not exist. To add something at the very beginning or end, use ""<<start>>"" or ""<<end>>"" as find.
 propose: 2 edit(s); tools: explain_rule({'rule_id': 'landmark-one-main'}) -> axe-core rule: landmark-one-main Document should have one main landmark. Ensure the document has a main landmark. Impact: moderate. This is a best-practice rul…: ""<<start>>"" -> ""<<start><main>""; ""<<end>>"" -> ""</main><<end>>""
-guard: rejected (broken_markup): stray ""<"" or "">"" left in the text (for example ""<</end>>""); tags opened or closed without their pair: <start>; content placed before <html> -> give_up
-give_up: left landmark-one-main unfixed (not_fixed)
+verify: passed -> accept
+accept: fixed landmark-one-main in 3 attempt(s)
 pick: nothing left to fix
-approve: nothing changed, nothing to approve
-report: score 10 -> 10; 0 rule(s) fixed"
-accessguru-131,landmark-one-main,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,6,8818,529,not_fixed after 3 attempt(s),rejected broken_markup 2,"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
+approve: approved automatically; for a person to check: adds_landmarks
+report: score 10 -> 7; 1 rule(s) fixed"
+accessguru-131,landmark-one-main,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,2,4,5690,435,fixed after 2 attempt(s),flagged adds_landmarks 1,"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: landmark-one-main
 screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (0 piece(s) of text))
 pick: next rule: landmark-one-main
 propose: edits could not be applied; tools: explain_rule({'rule_id': 'landmark-one-main'}) -> axe-core rule: landmark-one-main Document should have one main landmark. Ensure the document has a main landmark. Impact: moderate. This is a best-practice rul…: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown; the HTML may be a fragment, so tags such as </body> may not exist. To add something at the very beginning or end, use ""<<start>>"" or ""<<end>>"" as find.
 propose: 2 edit(s); tools: explain_rule({'rule_id': 'landmark-one-main'}) -> axe-core rule: landmark-one-main Document should have one main landmark. Ensure the document has a main landmark. Impact: moderate. This is a best-practice rul…: ""<<start>>"" -> ""<main>""; ""<<end>>"" -> ""</main>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: 2 edit(s); tools: explain_rule({'rule_id': 'landmark-one-main'}) -> axe-core rule: landmark-one-main Document should have one main landmark. Ensure the document has a main landmark. Impact: moderate. This is a best-practice rul…: ""<<start>>"" -> ""<main>""; ""<<end>>"" -> ""</main>""
-guard: rejected (broken_markup): content placed before <html> -> give_up
-give_up: left landmark-one-main unfixed (not_fixed)
+verify: passed -> accept
+accept: fixed landmark-one-main in 2 attempt(s)
 pick: nothing left to fix
-approve: nothing changed, nothing to approve
-report: score 10 -> 10; 0 rule(s) fixed"
-accessguru-135,page-has-heading-one,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,6,8925,742,not_fixed after 3 attempt(s),rejected broken_markup 2,"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: page-has-heading-one
+approve: approved automatically; for a person to check: adds_landmarks
+report: score 10 -> 7; 1 rule(s) fixed"
+accessguru-135,page-has-heading-one,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,2,4,5764,409,fixed after 2 attempt(s),"flagged added_visible_text 1, adds_landmarks 1","scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: page-has-heading-one
 screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (0 piece(s) of text))
 pick: next rule: page-has-heading-one
 propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<h1>Page Title</h1>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<h1>Page Title</h1>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated"">"" -> ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated""> <h1>Page Content</h1>""
-verify: Your change made another rule fail, ""region"": <h1>Page Content</h1> (Fix any of the following: Some page content is not contained by landmarks). To pass ""region"": All page content is contained by landmarks. -> give_up
-give_up: left page-has-heading-one unfixed (not_fixed)
+verify: Your change made another rule fail, ""region"": <h1>Page Title</h1> (Fix any of the following: Some page content is not contained by landmarks). To pass ""region"": All page content is contained by landmarks. -> retry
+propose: 3 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<main><h1>Page Title</h1>""; ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated"">"" -> ""<html lang=""en"" style=""--color-theme: #009BFF; --color-active-section: #009BFF;"" class=""hydrated"">""; ""<<end>>"" -> ""</main>""
+verify: passed -> accept
+accept: fixed page-has-heading-one in 2 attempt(s)
 pick: nothing left to fix
-approve: nothing changed, nothing to approve
-report: score 10 -> 10; 0 rule(s) fixed"
-accessguru-140,page-has-heading-one,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,5,7061,402,not_fixed after 3 attempt(s),rejected broken_markup 3,"scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: page-has-heading-one
+approve: approved automatically; for a person to check: added_visible_text, adds_landmarks
+report: score 10 -> 4; 1 rule(s) fixed"
+accessguru-140,page-has-heading-one,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,3,6,8557,692,fixed after 3 attempt(s),"flagged added_visible_text 1, adds_landmarks 1","scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: page-has-heading-one
 screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (0 piece(s) of text))
 pick: next rule: page-has-heading-one
 propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><h1>Page Content</h1>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: 1 edit(s): ""<<start>>"" -> ""<<start>><h1>Page Content</h1>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><h1>Page Title</h1>""
-guard: rejected (broken_markup): content placed before <html> -> give_up
+verify: Your change made another rule fail, ""region"": <h1>Page Content</h1> (Fix any of the following: Some page content is not contained by landmarks). To pass ""region"": All page content is contained by landmarks. -> retry
+propose: edits could not be applied; tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown; the HTML may be a fragment, so tags such as </body> may not exist. To add something at the very beginning or end, use ""<<start>>"" or ""<<end>>"" as find.
+propose: 2 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><main><h1>Page Content</h1>""; ""<<end>>"" -> ""</main><<end>>""
+verify: passed -> accept
+accept: fixed page-has-heading-one in 3 attempt(s)
+pick: nothing left to fix
+approve: approved automatically; for a person to check: added_visible_text, adds_landmarks
+report: score 14 -> 8; 1 rule(s) fixed"
+accessguru-141,page-has-heading-one,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,6,8811,847,not_fixed after 3 attempt(s),no objections,"scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: page-has-heading-one
+screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (0 piece(s) of text))
+pick: next rule: page-has-heading-one
+propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><body><h1>Hauptinhalt</h1>""
+verify: Your change made another rule fail, ""region"": <h1>Hauptinhalt</h1> (Fix any of the following: Some page content is not contained by landmarks). To pass ""region"": All page content is contained by landmarks. -> retry
+propose: edits could not be applied; tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown; the HTML may be a fragment, so tags such as </body> may not exist. To add something at the very beginning or end, use ""<<start>>"" or ""<<end>>"" as find.
+propose: 3 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><body><main>""; ""<<end>>"" -> ""</main></body>""; ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE"">"" -> ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE""><h1>Hauptinhalt</h1>""
+verify: Your change made another rule fail, ""region"": <h1>Hauptinhalt</h1> (Fix any of the following: Some page content is not contained by landmarks). To pass ""region"": All page content is contained by landmarks. -> give_up
 give_up: left page-has-heading-one unfixed (not_fixed)
 pick: nothing left to fix
 approve: nothing changed, nothing to approve
 report: score 14 -> 14; 0 rule(s) fixed"
-accessguru-141,page-has-heading-one,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,5,7280,592,not_fixed after 3 attempt(s),rejected broken_markup 2,"scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: page-has-heading-one
-screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (0 piece(s) of text))
-pick: next rule: page-has-heading-one
-propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><body><h1>Hauptinhalt</h1>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: edits could not be applied: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown; the HTML may be a fragment, so tags such as </body> may not exist. To add something at the very beginning or end, use ""<<start>>"" or ""<<end>>"" as find.
-propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><body><h1>Hauptinhalt</h1>""
-guard: rejected (broken_markup): content placed before <html> -> give_up
-give_up: left page-has-heading-one unfixed (not_fixed)
-pick: nothing left to fix
-approve: nothing changed, nothing to approve
-report: score 14 -> 14; 0 rule(s) fixed"
-accessguru-142,page-has-heading-one,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,6,9147,663,not_fixed after 3 attempt(s),rejected broken_markup 3,"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: page-has-heading-one
+accessguru-142,page-has-heading-one,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,3,6,9157,741,fixed after 3 attempt(s),"flagged added_visible_text 1, adds_landmarks 1","scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: page-has-heading-one
 screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (0 piece(s) of text))
 pick: next rule: page-has-heading-one
 propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><h1>Page Content</h1>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><h1>Page Content</h1>""
-guard: rejected (broken_markup): content placed before <html> -> retry
-propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start><h1>Page Content</h1>""
-guard: rejected (broken_markup): stray ""<"" or "">"" left in the text (for example ""<</end>>""); tags opened or closed without their pair: <start>; content placed before <html> -> give_up
-give_up: left page-has-heading-one unfixed (not_fixed)
+verify: Your change made another rule fail, ""region"": <h1>Page Content</h1> (Fix any of the following: Some page content is not contained by landmarks). To pass ""region"": All page content is contained by landmarks. -> retry
+propose: edits could not be applied; tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown; the HTML may be a fragment, so tags such as </body> may not exist. To add something at the very beginning or end, use ""<<start>>"" or ""<<end>>"" as find.
+propose: 2 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><main><h1>Page Content</h1>""; ""<<end>>"" -> ""</main><</end>>""
+verify: passed -> accept
+accept: fixed page-has-heading-one in 3 attempt(s)
 pick: nothing left to fix
-approve: nothing changed, nothing to approve
-report: score 10 -> 10; 0 rule(s) fixed"
+approve: approved automatically; for a person to check: added_visible_text, adds_landmarks
+report: score 10 -> 4; 1 rule(s) fixed"
 accessguru-165,image-alt,Syntax,False,no_improvement,5,5,False,False,,False,1.0,1.0,5,5,78721,14042,not_fixed after 5 attempt(s),flagged added_text_alternative 1,"scan: reused the caller's scan: 6 rule(s) violated, score 22; to fix: image-alt
 screen: no instructions to a model found (rules and meta-llama/llama-prompt-guard-2-86m (1 piece(s) of text))
 pick: next rule: image-alt

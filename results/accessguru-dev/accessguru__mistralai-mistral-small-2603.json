@@ -24,6 +24,16 @@
     "avg_old_score": 3.65,
     "avg_new_score": 1.95
   },
+  "safe": {
+    "violations": 40,
+    "score_decrease": 0.3699,
+    "resolved": 15,
+    "target_fixed": 19,
+    "introduced_new_violations": 5,
+    "avg_old_score": 3.65,
+    "avg_new_score": 2.3
+  },
+  "unsafe_fixes": 11,
   "element_level": {
     "violations": 26,
     "score_decrease": 0.7019,
@@ -64,5 +74,6 @@
   "model_seconds": 1577.6,
   "paid_cost_usd": 0.2726,
   "axe_version": "4.12.1",
+  "code_versions": [],
   "tokens_per_item": 25510
 }

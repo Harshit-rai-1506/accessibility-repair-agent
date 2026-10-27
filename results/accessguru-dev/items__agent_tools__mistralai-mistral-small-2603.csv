@@ -220,16 +220,16 @@ verify: passed -> accept
 accept: fixed page-has-heading-one in 3 attempt(s)
 pick: nothing left to fix
 report: score 14 -> 8; 1 rule(s) fixed"
-accessguru-141,page-has-heading-one,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,3,6,8811,847,fixed after 3 attempt(s),,"scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: page-has-heading-one
+accessguru-141,page-has-heading-one,Syntax,True,no_improvement,3,3,False,False,,False,1.0,1.0,3,6,8811,847,not_fixed after 3 attempt(s),,"scan: reused the caller's scan: 4 rule(s) violated, score 14; to fix: page-has-heading-one
 pick: next rule: page-has-heading-one
 propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><body><h1>Hauptinhalt</h1>""
 verify: Your change made another rule fail, ""region"": <h1>Hauptinhalt</h1> (Fix any of the following: Some page content is not contained by landmarks). To pass ""region"": All page content is contained by landmarks. -> retry
 propose: edits could not be applied; tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: Edit 2: the find text was not found (it begins ""</html>""). Copy it exactly from the HTML shown; the HTML may be a fragment, so tags such as </body> may not exist. To add something at the very beginning or end, use ""<<start>>"" or ""<<end>>"" as find.
 propose: 3 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><body><main>""; ""<<end>>"" -> ""</main></body>""; ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE"">"" -> ""<html prefix=""og: https://ogp.me/ns/website#"" lang=""de_DE""><h1>Hauptinhalt</h1>""
-verify: passed -> accept
-accept: fixed page-has-heading-one in 3 attempt(s)
+verify: Your change made another rule fail, ""region"": <h1>Hauptinhalt</h1> (Fix any of the following: Some page content is not contained by landmarks). To pass ""region"": All page content is contained by landmarks. -> give_up
+give_up: left page-has-heading-one unfixed (not_fixed)
 pick: nothing left to fix
-report: score 14 -> 8; 1 rule(s) fixed"
+report: score 14 -> 14; 0 rule(s) fixed"
 accessguru-142,page-has-heading-one,Syntax,True,ok,3,0,True,True,,False,1.0,1.0,3,6,9157,741,fixed after 3 attempt(s),,"scan: reused the caller's scan: 3 rule(s) violated, score 10; to fix: page-has-heading-one
 pick: next rule: page-has-heading-one
 propose: 1 edit(s); tools: explain_rule({'rule_id': 'page-has-heading-one'}) -> axe-core rule: page-has-heading-one Page should contain a level-one heading. Ensure that the page, or at least one of its frames contains a level-one heading. …: ""<<start>>"" -> ""<<start>><h1>Page Content</h1>""

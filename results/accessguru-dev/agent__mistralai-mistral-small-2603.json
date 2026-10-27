@@ -24,6 +24,16 @@
     "avg_old_score": 3.65,
     "avg_new_score": 1.175
   },
+  "safe": {
+    "violations": 40,
+    "score_decrease": 0.6096,
+    "resolved": 25,
+    "target_fixed": 25,
+    "introduced_new_violations": 0,
+    "avg_old_score": 3.65,
+    "avg_new_score": 1.425
+  },
+  "unsafe_fixes": 3,
   "element_level": {
     "violations": 26,
     "score_decrease": 0.6635,
@@ -61,8 +71,11 @@
   "calls": 82,
   "input_tokens": 259139,
   "output_tokens": 49692,
-  "model_seconds": 283.1,
-  "paid_cost_usd": 0.0687,
+  "model_seconds": 0.0,
+  "paid_cost_usd": 0.0,
   "axe_version": "4.12.1",
+  "code_versions": [
+    "dd2e88d"
+  ],
   "tokens_per_item": 7721
 }

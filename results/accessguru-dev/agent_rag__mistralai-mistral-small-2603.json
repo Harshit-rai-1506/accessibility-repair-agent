@@ -8,61 +8,74 @@
   "items_total": 40,
   "all": {
     "violations": 40,
-    "score_decrease": 0.6438,
-    "resolved": 26,
-    "target_fixed": 27,
-    "introduced_new_violations": 1,
+    "score_decrease": 0.6986,
+    "resolved": 28,
+    "target_fixed": 28,
+    "introduced_new_violations": 0,
     "avg_old_score": 3.65,
-    "avg_new_score": 1.3
+    "avg_new_score": 1.1
   },
   "deletions_fail": {
     "violations": 40,
-    "score_decrease": 0.6438,
-    "resolved": 26,
-    "target_fixed": 27,
-    "introduced_new_violations": 1,
+    "score_decrease": 0.6986,
+    "resolved": 28,
+    "target_fixed": 28,
+    "introduced_new_violations": 0,
     "avg_old_score": 3.65,
-    "avg_new_score": 1.3
+    "avg_new_score": 1.1
   },
+  "safe": {
+    "violations": 40,
+    "score_decrease": 0.6781,
+    "resolved": 27,
+    "target_fixed": 27,
+    "introduced_new_violations": 0,
+    "avg_old_score": 3.65,
+    "avg_new_score": 1.175
+  },
+  "unsafe_fixes": 1,
   "element_level": {
     "violations": 26,
-    "score_decrease": 0.6442,
-    "resolved": 17,
+    "score_decrease": 0.6923,
+    "resolved": 18,
     "target_fixed": 18,
-    "introduced_new_violations": 1,
+    "introduced_new_violations": 0,
     "avg_old_score": 4.0,
-    "avg_new_score": 1.423
+    "avg_new_score": 1.231
   },
   "by_category": {
     "Layout": {
       "violations": 12,
-      "score_decrease": 0.6596,
-      "resolved": 8,
-      "target_fixed": 8,
+      "score_decrease": 0.7447,
+      "resolved": 9,
+      "target_fixed": 9,
       "introduced_new_violations": 0,
       "avg_old_score": 3.917,
-      "avg_new_score": 1.333
+      "avg_new_score": 1.0
     },
     "Syntax": {
       "violations": 28,
-      "score_decrease": 0.6364,
-      "resolved": 18,
+      "score_decrease": 0.6768,
+      "resolved": 19,
       "target_fixed": 19,
-      "introduced_new_violations": 1,
+      "introduced_new_violations": 0,
       "avg_old_score": 3.536,
-      "avg_new_score": 1.286
+      "avg_new_score": 1.143
     }
   },
   "status": {
-    "ok": 27,
-    "no_improvement": 13
+    "ok": 28,
+    "no_improvement": 12
   },
   "dropped_content": 0,
-  "calls": 157,
-  "input_tokens": 717135,
-  "output_tokens": 73270,
-  "model_seconds": 479.2,
-  "paid_cost_usd": 0.1515,
+  "calls": 145,
+  "input_tokens": 659884,
+  "output_tokens": 63460,
+  "model_seconds": 425.6,
+  "paid_cost_usd": 0.1371,
   "axe_version": "4.12.1",
-  "tokens_per_item": 19760
+  "code_versions": [
+    "dd2e88d"
+  ],
+  "tokens_per_item": 18084
 }

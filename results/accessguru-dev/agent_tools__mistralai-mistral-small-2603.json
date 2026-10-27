@@ -8,22 +8,32 @@
   "items_total": 40,
   "all": {
     "violations": 40,
-    "score_decrease": 0.7808,
-    "resolved": 31,
-    "target_fixed": 33,
+    "score_decrease": 0.7603,
+    "resolved": 30,
+    "target_fixed": 32,
     "introduced_new_violations": 2,
     "avg_old_score": 3.65,
-    "avg_new_score": 0.8
+    "avg_new_score": 0.875
   },
   "deletions_fail": {
     "violations": 40,
-    "score_decrease": 0.7808,
-    "resolved": 31,
-    "target_fixed": 33,
+    "score_decrease": 0.7603,
+    "resolved": 30,
+    "target_fixed": 32,
     "introduced_new_violations": 2,
     "avg_old_score": 3.65,
-    "avg_new_score": 0.8
+    "avg_new_score": 0.875
   },
+  "safe": {
+    "violations": 40,
+    "score_decrease": 0.7603,
+    "resolved": 30,
+    "target_fixed": 32,
+    "introduced_new_violations": 2,
+    "avg_old_score": 3.65,
+    "avg_new_score": 0.875
+  },
+  "unsafe_fixes": 0,
   "element_level": {
     "violations": 26,
     "score_decrease": 0.7212,
@@ -45,24 +55,27 @@
     },
     "Syntax": {
       "violations": 28,
-      "score_decrease": 0.798,
-      "resolved": 22,
-      "target_fixed": 24,
+      "score_decrease": 0.7677,
+      "resolved": 21,
+      "target_fixed": 23,
       "introduced_new_violations": 2,
       "avg_old_score": 3.536,
-      "avg_new_score": 0.714
+      "avg_new_score": 0.821
     }
   },
   "status": {
-    "ok": 33,
-    "no_improvement": 7
+    "ok": 32,
+    "no_improvement": 8
   },
   "dropped_content": 0,
   "calls": 167,
   "input_tokens": 569353,
   "output_tokens": 59055,
-  "model_seconds": 409.5,
-  "paid_cost_usd": 0.1208,
+  "model_seconds": 0.0,
+  "paid_cost_usd": 0.0,
   "axe_version": "4.12.1",
+  "code_versions": [
+    "dd2e88d"
+  ],
   "tokens_per_item": 15710
 }
