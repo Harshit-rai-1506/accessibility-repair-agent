@@ -43,9 +43,9 @@ dev runs (docs/05-guardrails.md §10):
 - the guard's feedback says how to fix broken markup;
 - retrieval returns one passage per page.
 
-Then the code was frozen at commit `a4dc45b`, tagged **`test-freeze`**
-(Step 0 below creates the tag). Every result row now records the commit that
-produced it (the `code` field). A run that was resumed after a code change therefore shows up in the
+Then the code was frozen: Step 0 below tags the commit you run as
+**`test-freeze`**, and every result row records the commit that produced it
+(the `code` field). A run that was resumed after a code change therefore shows up in the
 report as using two versions, instead of silently mixing them.
 
 ## 3. How the numbers are read
@@ -126,7 +126,7 @@ git pull
 pip install -e ".[dev]"
 python scripts/check_setup.py
 python -m pytest
-git tag -a test-freeze a4dc45b -m "Code frozen for the test-set runs"
+git tag -a test-freeze -m "Code frozen for the test-set runs"
 git push origin test-freeze
 ```
 
