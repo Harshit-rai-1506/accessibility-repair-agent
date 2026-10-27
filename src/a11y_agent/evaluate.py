@@ -137,6 +137,7 @@ async def evaluate_item(item: BenchmarkItem, method, scanner: Scanner, model: Mo
         "seconds": round(time.perf_counter() - started, 2),
         "note": result.note,
         "guard": result.guard,
+        "guard_problems": guard_problems(item.html, result.html),
         "code": _CODE_VERSION,
         "fixed_html": result.html,
         "response": result.response,
@@ -147,9 +148,27 @@ async def evaluate_item(item: BenchmarkItem, method, scanner: Scanner, model: Mo
 # A whole run
 # ---------------------------------------------------------------------------
 
-def _outcome(row: dict, *, deletions_fail: bool = False) -> FixOutcome:
-    """The row's score; with ``deletions_fail``, a fix that removed content counts as no fix at all."""
-    if deletions_fail and row.get("dropped_content"):
+def guard_problems(original: str, fixed: str | None) -> list[str]:
+    """The guardrail checks a final fix fails, for every method (removes_content, hides_content, broken_markup, ...).
+
+    The scanner passes fixes that hide, delete or break the page (docs/05-guardrails.md §1); the safe score
+    counts those as no fix, so methods are compared on real fixes only.
+    """
+    if not fixed or fixed == original:
+        return []
+    from .guardrails import check_fix
+    return [p.code for p in check_fix(original, fixed)]
+
+
+def unsafe(row: dict) -> bool:
+    """The fix removed content or fails a guardrail check."""
+    return bool(row.get("dropped_content") or row.get("guard_problems"))
+
+
+def _outcome(row: dict, *, deletions_fail: bool = False, unsafe_fail: bool = False) -> FixOutcome:
+    """The row's score; a fix that removed content (``deletions_fail``), or that fails a guardrail check
+    (``unsafe_fail``), counts as no fix at all."""
+    if (deletions_fail and row.get("dropped_content")) or (unsafe_fail and unsafe(row)):
         return FixOutcome(row["rule_id"], row["old_score"], row["old_score"], False, row["introduced"])
     return FixOutcome(row["rule_id"], row["old_score"], row["new_score"], row["target_fixed"], row["introduced"])
 
@@ -172,6 +191,9 @@ def summarize_rows(rows: list[dict], *, method: str, model: str | None, dataset:
         "all": summarize(_outcome(r) for r in scored),
         # The metric alone rewards deleting the broken element; here a deletion scores as no fix.
         "deletions_fail": summarize(_outcome(r, deletions_fail=True) for r in scored),
+        # Stricter: only fixes the guardrails accept (nothing removed or hidden, no scripts or URLs, valid markup).
+        "safe": summarize(_outcome(r, unsafe_fail=True) for r in scored),
+        "unsafe_fixes": sum(bool(r.get("guard_problems")) for r in scored),
         "element_level": summarize(_outcome(r) for r in element_level),
         "by_category": {cat: summarize(_outcome(r) for r in scored if r["category"] == cat)
                         for cat in sorted({r["category"] for r in scored})},
@@ -298,18 +320,21 @@ def _fmt(x, pct=False) -> str:
 
 def report_table(summaries: list[dict]) -> str:
     """Markdown table comparing runs."""
-    head = ("| Method | Model | Items | Score decrease | Deletions count as failures | Element-level only | Resolved "
-            "| Broke something | Dropped content | Too large | Tokens per item | Paid cost |")
-    lines = [head, "|" + "---|" * 12]
+    head = ("| Method | Model | Items | Score decrease | Deletions count as failures | Safe fixes only "
+            "| Element-level only | Resolved | Broke something | Dropped content | Unsafe fixes | Too large "
+            "| Tokens per item | Paid cost |")
+    lines = [head, "|" + "---|" * 14]
     for s in sorted(summaries, key=lambda s: (s["method"] != "noop", s["method"], s["model"] or "")):
         a, e = s["all"], s["element_level"]
         strict = (s.get("deletions_fail") or {}).get("score_decrease")
+        safe = (s.get("safe") or {}).get("score_decrease")
         done = f"{s['items_done']}/{s['items_total']}" + ("" if s["complete"] else " (partial)")
         cost = "-" if s.get("paid_cost_usd") is None else f"${s['paid_cost_usd']:.2f}"
         lines.append(
             f"| {s['method']} | {(s['model'] or '-').split(':')[-1]} | {done} | {_fmt(a['score_decrease'])} "
-            f"| {_fmt(strict)} | {_fmt(e['score_decrease'])} | {a['resolved']}/{a['violations']} | {a['introduced_new_violations']} "
-            f"| {s['dropped_content']} | {s['status'].get('too_large', 0)} | {s['tokens_per_item']} | {cost} |"
+            f"| {_fmt(strict)} | {_fmt(safe)} | {_fmt(e['score_decrease'])} | {a['resolved']}/{a['violations']} "
+            f"| {a['introduced_new_violations']} | {s['dropped_content']} | {s.get('unsafe_fixes', '-')} "
+            f"| {s['status'].get('too_large', 0)} | {s['tokens_per_item']} | {cost} |"
         )
     return "\n".join(lines)
 
@@ -330,6 +355,20 @@ def guard_table(summaries: list[dict]) -> str:
     return "\n".join(lines) if len(lines) > 2 else ""
 
 
+def _add_guard_problems(rows: list[dict], dataset: str, split: str) -> None:
+    """Rows saved before Phase 6 lack ``guard_problems``: work them out from the original items."""
+    missing = [r for r in rows if "guard_problems" not in r and r.get("fixed_html")]
+    if not missing:
+        return
+    try:
+        originals = {i.id: i.html for i in load_split(dataset, split)}
+    except Exception:                                # no benchmark data here: the safe score stays unknown
+        return
+    for r in missing:
+        if r["id"] in originals:
+            r["guard_problems"] = guard_problems(originals[r["id"]], r["fixed_html"])
+
+
 def collect_runs(dataset: str, split: str) -> list[tuple[dict, list[dict]]]:
     """(summary, rows) for every run of a split."""
     base = settings.runs_dir / f"{dataset}-{split}"
@@ -339,6 +378,7 @@ def collect_runs(dataset: str, split: str) -> list[tuple[dict, list[dict]]]:
         rows = [json.loads(l) for l in results.read_text(encoding="utf-8").splitlines() if l.strip()] \
             if results.exists() else []
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        _add_guard_problems(rows, dataset, split)
         if rows:      # re-score from the saved rows, so reports always use the current scoring code
             summary = summarize_rows(rows, method=summary["method"], model=summary["model"],
                                      dataset=summary["dataset"], split=summary["split"],
@@ -393,13 +433,13 @@ def compare_table(runs: list[tuple[dict, list[dict]]], baseline: str) -> str:
     """Each method's score with a 95% interval, and a paired comparison with ``baseline``.
 
     Only items every run scored are used, in the same order for every run, so
-    each comparison is paired. Scores count deletions as failures.
+    each comparison is paired. Scores count only safe fixes (see ``unsafe``).
     """
     from . import stats
     ids, by_run = _aligned(runs)
     keys = sorted(by_run, key=lambda k: (k.split("|")[0] != "noop", k))
     base_key = next((k for k in keys if k.split("|")[0] == baseline), None)
-    head = (f"| Method | Model | Items | Score (deletions = failures) | 95% interval | vs {baseline} "
+    head = (f"| Method | Model | Items | Safe score | 95% interval | vs {baseline} "
             "| 95% interval of the difference | Resolved here, not there / there, not here | Sign test p |")
     lines = [head, "|" + "---|" * 9]
     for key in keys:
@@ -446,6 +486,7 @@ FAILURE_KINDS = {
     "blocked": "blocked at the input screen",
     "too_large": "request too large to send",
     "deleted": "deleted content",
+    "unsafe": "fixed for the scanner, but fails the guardrail checks",
     "broke": "fixed the target but broke another rule",
     "guard": "every attempt rejected by the guardrails",
     "no_match": "edits did not match the page",
@@ -466,6 +507,8 @@ def failure_kind(row: dict) -> str:
         return "too_large"
     if row.get("dropped_content"):
         return "deleted"
+    if row.get("guard_problems") and row.get("target_fixed"):
+        return "unsafe"
     if row.get("target_fixed") and row.get("introduced"):
         return "broke"
     if row["new_score"] is not None and row["old_score"] and row["new_score"] < row["old_score"]:
@@ -645,8 +688,8 @@ def main(argv: list[str] | None = None) -> int:
             target.mkdir(parents=True, exist_ok=True)
             (target / "comparison.md").write_text(
                 f"# Comparison: {args.dataset} {args.split} ({model})\n\n"
-                "Made with `python -m a11y_agent.evaluate compare --save`. Items every run scored; deletions count "
-                f"as failures; 95% intervals from {10000:,} bootstrap resamples of the items (paired for differences); "
+                "Made with `python -m a11y_agent.evaluate compare --save`. Items every run scored; safe fixes only "
+                f"(a fix that removed or hid content, added a script or URL, or broke the markup counts as no fix); 95% intervals from {10000:,} bootstrap resamples of the items (paired for differences); "
                 "sign test on items one method resolved and the other did not.\n\n" + text + "\n", encoding="utf-8")
             print(f"\nSaved to {_shown(target / 'comparison.md')}")
         return 0
@@ -670,6 +713,8 @@ def main(argv: list[str] | None = None) -> int:
             f"# Results: {args.dataset} {args.split} split\n\n"
             "Made with `python -m a11y_agent.evaluate report --save`. One JSON summary per run, and "
             "`items__*.csv` with one line per item (outcome, cost, and the agent's step trace).\n\n"
+            "*Safe fixes only*: a fix that fails a guardrail check (removed or hid content, added a script or "
+            "URL, broke the markup) counts as no fix, whichever method made it.\n\n"
             "*Deletions count as failures*: the same score, but a fix that removed more than a tenth of the "
             "content scores as no fix.\n\n"
             + table + "\n", encoding="utf-8")

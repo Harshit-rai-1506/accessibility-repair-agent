@@ -13,8 +13,10 @@ of 40 items. So every comparison in the final report comes with:
 - an exact sign test on the items one method resolved and the other did not.
 
 The score is the AccessGuru violation score decrease, 1 - sum(new) / sum(old),
-with deletions counted as failures (a fix that removed content scores as no
-fix), exactly as ``evaluate.summarize_rows`` computes it.
+counting only safe fixes: a fix that removed content, or that fails a
+guardrail check (hid content, added a script or URL, broke the markup),
+scores as no fix. This is the "safe fixes only" score of
+``evaluate.summarize_rows``.
 """
 
 from __future__ import annotations
@@ -27,20 +29,24 @@ RESAMPLES = 10_000
 SEED = 20261028            # fixed, so a report is reproducible to the last digit
 
 
-def scores(row: dict, *, deletions_fail: bool = True) -> tuple[int, int]:
-    """(old score, new score) of one result row; a deletion keeps the old score when ``deletions_fail``."""
+def _unsafe(row: dict) -> bool:
+    return bool(row.get("dropped_content") or row.get("guard_problems"))
+
+
+def scores(row: dict, *, strict: bool = True) -> tuple[int, int]:
+    """(old score, new score) of one result row; with ``strict``, an unsafe fix keeps the old score."""
     old = row["old_score"]
-    new = old if deletions_fail and row.get("dropped_content") else row["new_score"]
+    new = old if strict and _unsafe(row) else row["new_score"]
     return old, new
 
 
 def resolved(row: dict) -> bool:
-    """Fixed cleanly, and without deleting content."""
-    return bool(row.get("resolved")) and not row.get("dropped_content")
+    """Fixed cleanly, and safely."""
+    return bool(row.get("resolved")) and not _unsafe(row)
 
 
-def score_decrease(rows: list[dict], *, deletions_fail: bool = True) -> float:
-    pairs = [scores(r, deletions_fail=deletions_fail) for r in rows]
+def score_decrease(rows: list[dict], *, strict: bool = True) -> float:
+    pairs = [scores(r, strict=strict) for r in rows]
     old = sum(o for o, _ in pairs)
     return 1 - sum(n for _, n in pairs) / old if old else 0.0
 

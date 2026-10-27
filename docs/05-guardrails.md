@@ -377,19 +377,42 @@ and the numbers say so.
 **Review load.** 26 of 40 changes would need a person's look: colours 9,
 alt text and labels 9, new landmarks 8, decorative images 2, a language 1.
 
-**What changed before the final runs (all methods, not tuned on items):**
+**Reading the gap correctly.** The guardrails can only veto fixes, never
+add one, so with the same model and prompts the guarded agent cannot score
+*higher* than `agent_tools` on the scanner's score. The question is whether
+`agent_tools`' extra points were real. They were not: all 7 were fixes the
+guardrails reject (broken HTML that axe-core accepts). Scored fairly, with
+such fixes counted as no fix (the **safe score**, added to every report in
+Phase 6), `agent_tools` also comes to about 0.64 on these runs. Removing 7
+items worth 3 points each takes it from 0.78 to 0.64. So the useful goal is
+not "guarded beats tools" but "both make *valid* fixes for those items".
 
-1. The prompt's rules say where new elements go: right after `<body>`, or
-   after `<html ...>` when there is no `<body>`; never before `<html>` or
-   after `</html>`.
-2. The edit format refuses `<<start>>` on HTML that begins with its `<html>`
-   tag (and `<<end>>` after `</html>`), with that same instruction, and
-   refuses a mistyped anchor (`<<start>`, `<</end>>`) instead of pasting it into
-   the page. This applies to every agent method, so `agent_tools` no longer
-   accepts the two garbage fixes either, and the E-versus-C comparison stays
-   paired.
-3. The guard's `broken_markup` feedback now says how to fix each problem.
+**What changed (every agent method; nothing tuned to individual items):**
+
+1. **Anchors are valid by construction.** `<<start>>` and `<<end>>` now insert
+   at the start and end of the page's *content*: after `<body>` (or after
+   `</head>` or the `<html ...>` tag when there is no `<body>`), and before
+   `</body>`. The model's usual wrap, `<<start>> -> <main>` with
+   `<<end>> -> </main>`, can no longer put anything outside the page.
+   Mistyped anchors repeated in the replacement (`<<start>`, `<</end>>`) are
+   removed, like correctly typed ones always were.
+2. **The prompt is unchanged, on purpose.** It is word for word the Phase 5
+   prompt, so re-running the dev set reuses the cached model replies, and
+   any change in the results is caused by the new edit rules alone.
+3. The guard's `broken_markup` feedback says how to fix each problem.
 4. Retrieval returns at most one passage per page (Phase 4's duplicates).
+
+**Checked offline, on the model's real attempts.** Replaying the recorded
+attempts on the 7 items under the new rules, with the real scanner and the
+guard:
+
+- 121, 122, 131: the guarded agent's own first attempts, all rejected in Phase
+  5, now pass both. They would be fixed on attempt 1.
+- 135, 140, 142: the first attempt adds an `<h1>` outside any landmark, so the
+  scanner reports `region`: genuine feedback, the same that `agent_tools`
+  received. `agent_tools`' next attempt (wrap in `<main>`) now passes both
+  checks. With the same prompt, the guarded agent gets the same cached reply.
+- 141: unknown; the trace is cut off before the attempt that worked.
 
 The guard's check stays as a second line of defence: a model can still write
 `<main>` before `<html>` by editing the tag itself.

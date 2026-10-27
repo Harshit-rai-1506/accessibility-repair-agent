@@ -129,31 +129,29 @@ def test_start_and_end_anchors_wrap_a_fragment():
     fixed = apply_edits('<div><img src="a.png"></div>', [Edit(find="<<start>>", replace="<main>"),
                                                           Edit(find="<<end>>", replace="</main>")])
     assert fixed == '<main><div><img src="a.png"></div></main>'
-    # A fragment that is only an <html> tag: new content goes after it, never before (dev items 131, 142)
-    assert apply_edits('<html lang="en">', [Edit(find="<<end>>", replace="<main><h1>T</h1></main>")]) == \
-        '<html lang="en"><main><h1>T</h1></main>'
-    with pytest.raises(EditError, match="before the <html> tag"):
-        apply_edits('<html lang="en">', [Edit(find="<<start>>", replace="<main>")])
     with pytest.raises(EditError, match="<<end>>"):                # the hint when a guessed closing tag is missing
         apply_edits('<html lang="en">', [Edit(find="</body>", replace="<main></main></body>")])
 
 
-def test_anchors_never_put_content_outside_a_whole_document():
-    page = "<!doctype html><html><body><p>x</p></body></html>"
-    with pytest.raises(EditError, match="before the <html> tag"):
-        apply_edits(page, [Edit(find="<<start>>", replace="<main>")])
-    with pytest.raises(EditError, match="after </html>"):
-        apply_edits(page, [Edit(find="<<end>>", replace="</main>")])
-    assert apply_edits(page, [Edit(find="<body>", replace="<body><main>"), Edit(find="</body>", replace="</main></body>")]) \
-        == "<!doctype html><html><body><main><p>x</p></main></body></html>"
+@pytest.mark.parametrize("page, wrapped", [
+    # dev items 131, 135, 140-142: the snippet is only an <html> tag
+    ('<html lang="en">', '<html lang="en"><main><h1>T</h1></main>'),
+    # dev items 121, 122: a whole document
+    ("<!doctype html><html><head><title>T</title></head><body><p>x</p></body></html>",
+     "<!doctype html><html><head><title>T</title></head><body><main><h1>T</h1><p>x</p></main></body></html>"),
+    ("<html><head><title>T</title></head><p>x</p></html>", "<html><head><title>T</title></head><main><h1>T</h1><p>x</p></main></html>"),
+])
+def test_anchors_insert_inside_the_page_content(page, wrapped):
+    """"<<start>>" meant "before <html>" until Phase 6: invalid HTML that axe-core accepted."""
+    edits = [Edit(find="<<start>>", replace="<main><h1>T</h1>"), Edit(find="<<end>>", replace="</main>")]
+    assert apply_edits(page, edits) == wrapped
 
 
 @pytest.mark.parametrize("typo", ["<<start>", "<</end>>", "<<end>", "<start>>"])
-def test_a_mistyped_anchor_is_refused_not_pasted_into_the_page(typo):
+def test_a_mistyped_anchor_never_reaches_the_page(typo):
     """Accepted by axe-core in the dev runs (items 122, 142): a stray "<<start>" or "<</end>>" in the page."""
-    with pytest.raises(EditError, match="mistyped"):
-        apply_edits("<div>x</div>", [Edit(find="<<end>>", replace=f"</main>{typo}")])
-    assert apply_edits("<div>x</div>", [Edit(find="<<end>>", replace="</main><<end>>")]) == "<div>x</div></main>"
+    assert apply_edits("<div>x</div>", [Edit(find="<<end>>", replace=f"</section>{typo}")]) == "<div>x</div></section>"
+    assert apply_edits("<div>x</div>", [Edit(find="<<start>>", replace=f"{typo}<section>")]) == "<section><div>x</div>"
 
 
 def test_replace_all_is_optional_when_parsing():

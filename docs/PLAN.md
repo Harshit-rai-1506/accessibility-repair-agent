@@ -366,8 +366,17 @@ results and resume bullets.
 how well, at what cost, and where it fails.
 
 **Built**
-- The freeze: last dev-based fixes (above, and one retrieval passage per page),
-  then the commit tagged `test-freeze`; every result row records its commit.
+- Last dev-based fixes (28 Oct, after the user asked to improve the guarded
+  agent before any test run): `<<start>>`/`<<end>>` insert inside the page's
+  content (valid HTML by construction; mistyped anchors removed); prompt kept
+  word for word as in Phase 5 so the dev re-run reuses cached replies; one
+  retrieval passage per page. A replay of the model's recorded attempts on
+  the 7 lost items: 6 now pass axe-core and the guard (141 unknown).
+- The **safe score** in every report and as the main score in `compare`: a
+  fix that fails a guardrail check counts as no fix, for every method. On the
+  Phase 5 runs `agent_tools` is about 0.64 on it, the same as `agent_guarded`.
+- The gate: the dev re-run first; the freeze (tag `test-freeze`) and the test
+  runs only after it; every result row records its commit.
 - `stats.py` and `evaluate compare`: each score with a 95% bootstrap
   interval; paired differences against `agent_tools` with intervals; sign
   tests on resolved flips; cost and speed table (calls, tokens, model and wall
@@ -377,7 +386,7 @@ how well, at what cost, and where it fails.
   20 listed for reading.
 - `evaluate run --method a b c`: several methods in one command.
 - `scripts/public_pages.py`: before/after on real public pages.
-- Guide: [docs/06-results.md](06-results.md) (the run plan, step by step). 248 tests.
+- Guide: [docs/06-results.md](06-results.md) (the run plan, step by step). 252 tests.
 
 *Dropped:* repeating A and E on a smaller model (gpt-oss on Groq's free tier
 allows about 200K tokens a day; method E needs about 2M for the test set).

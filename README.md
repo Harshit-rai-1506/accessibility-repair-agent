@@ -9,8 +9,8 @@ guardrails. Runs on free, open-weight models.
 > evaluation harness and baselines, the LangGraph agent, an MCP tool server
 > the agent uses as a client, retrieval over the WCAG documents, and
 > guardrails with human approval. Dev-set results below. Phase 6 (the final,
-> frozen runs on the 138 held-back test items) is set up; its numbers come
-> next. See the [build plan](docs/PLAN.md).
+> frozen runs on the 138 held-back test items) is set up, behind one more dev
+> check. See the [build plan](docs/PLAN.md).
 
 ## The problem
 
@@ -65,8 +65,11 @@ chance could do on 40 items
 The guardrails cost nothing on element-level problems (0.72 either way); all
 seven items they lost were page-level fixes that put `<main>` before `<html>`
 or left `<</end>>` in the page, which axe-core accepts and the guardrails
-reject. The edit format and the prompt were fixed for that before the final
-runs ([docs/05-guardrails.md §10](docs/05-guardrails.md#10-dev-results-and-what-they-changed)).
+reject. Counted fairly, with such fixes as no fix (the *safe score*, now in
+every report), `agent_tools` also comes to about 0.64. The edit format now
+makes those wraps valid HTML by construction; the dev re-run comes before
+any test-set run
+([docs/05-guardrails.md §10](docs/05-guardrails.md#10-dev-results-and-what-they-changed)).
 With 40 items the 95% intervals are about ±0.14 wide, which is why the final
 comparison uses the 138 held-back items, with paired tests.
 Full tables, per-item outcomes
@@ -129,7 +132,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 248 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 252 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```

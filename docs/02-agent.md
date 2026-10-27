@@ -439,7 +439,7 @@ showed five causes, none of them about the model's knowledge:
 | Cause | Items | What the trace showed | Fix |
 |---|---|---|---|
 | Duplicate text | 165, 170, 069, 010 | Snippets repeat the same `<img>` or CSS rule (carousel clones, repeated rules); every edit was rejected as "occurs 2 times" | `replace_all` on an edit changes every copy |
-| Fragments, not pages | 121, 122, 131, 039 | The snippet is only `<html lang="en">`; the model edited a `</body>` or `</html>` that is not there | `<<start>>` / `<<end>>` insert at the beginning or end; the prompt says the HTML may be a fragment |
+| Fragments, not pages | 121, 122, 131, 039 | The snippet is only `<html lang="en">`; the model edited a `</body>` or `</html>` that is not there | `<<start>>` / `<<end>>` insert at the beginning or end (since Phase 6: of the page's content, inside `<body>`); the prompt says the HTML may be a fragment |
 | New content trips `region` | 135, 141, 142, 187 | A new `<h1>` or label outside any landmark made "region" fail, three times in a row | Feedback now says how to pass the newly broken rule, in axe-core's words ("All page content is contained by landmarks"); the prompt says new content must not break other rules |
 | Many failing elements | 175, 100 | Attempt 1 fixed 5 of 55 images; attempts 2 and 3 were cut off at 3,072 tokens, and the partial fix was thrown away | The reply budget grows with the number of failing elements (within the provider's limit), and **progress is kept**: a change that fixes some elements and breaks nothing becomes the starting point for the next attempt |
 | Repeating itself | 039 | The same failed edit three times | Feedback points out a repeated change |

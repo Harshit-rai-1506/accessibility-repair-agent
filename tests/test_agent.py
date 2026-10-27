@@ -247,15 +247,13 @@ def test_anchor_tokens_never_reach_the_page():
     assert outcome(state, "region")["status"] == "fixed"
 
 
-def test_anchors_never_wrap_a_whole_document():
-    """<main> before <html> is invalid HTML (accepted by axe-core in the dev runs); the model is told where to put it."""
+def test_anchors_wrap_a_whole_document_inside_its_body():
+    """Dev items 121 and 122: "<<start>> -> <main>" on a whole page is now valid HTML on the first attempt."""
     wrap = proposal(("<<start>>", "<main>"), ("<<end>>", "</main>"))
-    inside = proposal(("<body>", "<body><main>"), ("</body>", "</main></body>"))
     page = '<!doctype html><html lang="en"><head><title>T</title></head><body><h1>T</h1><p>Text here.</p></body></html>'
-    state, llm = run_agent(page, [wrap, inside], targets=["region"])
-    assert "before the <html> tag" in llm.prompts[1] and "after the opening <body> tag" in llm.prompts[1]
-    assert outcome(state, "region")["status"] == "fixed"
-    assert state["current_html"].startswith('<!doctype html><html lang="en">') and "<body><main><h1>" in state["current_html"]
+    state, llm = run_agent(page, [wrap], targets=["region"])
+    assert outcome(state, "region")["status"] == "fixed" and llm.calls == 1
+    assert state["current_html"] == page.replace("<body>", "<body><main>").replace("</body>", "</main></body>")
 
 
 def test_failed_attempts_still_count_their_tokens():

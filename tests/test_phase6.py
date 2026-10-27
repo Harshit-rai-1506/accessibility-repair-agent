@@ -22,21 +22,40 @@ from a11y_agent.evaluate import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def row(i, old=5, new=0, *, dropped=False, resolved=None, status="ok", response="", introduced=(), target_fixed=None):
+def row(i, old=5, new=0, *, dropped=False, resolved=None, status="ok", response="", introduced=(), target_fixed=None,
+        problems=()):
     return {"id": f"t-{i:03}", "rule_id": "image-alt", "category": "Syntax", "page_level": False, "status": status,
             "old_score": old, "new_score": new, "target_fixed": new == 0 if target_fixed is None else target_fixed,
             "resolved": (new == 0) if resolved is None else resolved, "introduced": list(introduced),
             "dropped_content": dropped, "text_kept": 1.0, "elements_kept": 1.0, "passes": 1, "calls": 2,
             "cached_calls": 1, "input_tokens": 1000, "output_tokens": 100, "model_seconds": 2.0, "seconds": 5.0,
-            "note": "", "response": response, "guard": None, "code": "abc123"}
+            "note": "", "response": response, "guard": None, "code": "abc123", "guard_problems": list(problems)}
 
 
 def test_scores_count_deletions_as_failures_like_the_report():
     rows = [row(1), row(2, new=5), row(3, dropped=True)]
     assert stats.score_decrease(rows) == pytest.approx(1 - 10 / 15)
-    assert stats.score_decrease(rows, deletions_fail=False) == pytest.approx(1 - 5 / 15)
+    assert stats.score_decrease(rows, strict=False) == pytest.approx(1 - 5 / 15)
     assert summarize_rows(rows, method="m", model=None, dataset="t", split="dev",
                           total_items=3)["deletions_fail"]["score_decrease"] == pytest.approx(1 - 10 / 15, abs=1e-4)
+
+
+def test_the_safe_score_counts_fixes_the_guardrails_reject_as_no_fix():
+    """agent_tools' dev fixes that put <main> before <html> passed axe-core; the safe score does not count them."""
+    rows = [row(1), row(2, problems=["broken_markup"]), row(3, dropped=True)]
+    summary = summarize_rows(rows, method="m", model=None, dataset="t", split="dev", total_items=3)
+    assert summary["all"]["score_decrease"] == 1.0
+    assert summary["safe"]["score_decrease"] == pytest.approx(1 / 3, abs=1e-4) and summary["unsafe_fixes"] == 1
+    assert stats.score_decrease(rows) == pytest.approx(1 / 3) and not stats.resolved(rows[1])
+    assert failure_kind(rows[1]) == "unsafe"
+
+
+def test_guard_problems_are_recorded_for_every_method():
+    from a11y_agent.evaluate import guard_problems
+    page = '<html lang="en">'
+    assert guard_problems(page, "<main>" + page + "</main>") == ["broken_markup"]
+    assert guard_problems(page, page + "<main></main>") == []
+    assert guard_problems(page, None) == [] and guard_problems(page, page) == []
 
 
 def test_bootstrap_intervals_contain_the_score_and_shrink_with_more_items():

@@ -31,29 +31,46 @@ Two test sets:
 - **ACCESS**: 100 items from a second benchmark (26 rules), never used
   before. It shows whether the results carry over to different pages.
 
-## 2. The freeze
+## 2. Improve on dev, then freeze
 
-Every decision was made on the 40 dev items: prompts, attempt limits, which
+Every decision is made on the 40 dev items: prompts, attempt limits, which
 guardrails reject and which only flag. The last round came from the Phase 5
-dev runs (docs/05-guardrails.md §10):
+dev runs (docs/05-guardrails.md §10). The guarded agent lost 7 page-level
+items, because every way the model wrapped a page in `<main>` put it before
+`<html>` (or left a mistyped `<</end>>`). axe-core accepts those. So:
 
-- the prompt says where new elements go (after `<body>`, never before `<html>`);
-- the edit format refuses anchors that would put content outside the page,
-  and mistyped anchors such as `<<start>`;
+- `<<start>>` and `<<end>>` now insert inside the page's content, so the usual
+  wrap is valid HTML by construction; mistyped anchors are removed;
+- the prompt is word for word the Phase 5 prompt, so the dev re-run reuses the
+  cached replies and measures this change alone;
 - the guard's feedback says how to fix broken markup;
 - retrieval returns one passage per page.
 
-Then the code was frozen: Step 0 below tags the commit you run as
-**`test-freeze`**, and every result row records the commit that produced it
-(the `code` field). A run that was resumed after a code change therefore shows up in the
-report as using two versions, instead of silently mixing them.
+**The gate.** The test set is only touched once the dev re-run shows the
+guarded agent close to `agent_tools` on the safe score. If it does not, the
+next round of fixes is again made on dev. Then the code is frozen: the commit
+is tagged **`test-freeze`**, and every result row records the commit that
+produced it (the `code` field). A run that was resumed after a code change
+therefore shows up in the report as using two versions, instead of silently
+mixing them.
+
+**Where things run.** The evaluations run on your laptop, as they always have,
+because they need your Mistral key. GitHub's CI only runs the automated tests
+(does the code work on Linux and Windows); while the repository is private it
+needs Actions minutes, so `python -m pytest` on your laptop does that job.
 
 ## 3. How the numbers are read
 
-**The main score** is the AccessGuru violation score decrease, counting a fix
-that deleted content as no fix ("deletions count as failures"). On the dev
-set the plain metric made AccessGuru look best (0.75) only because 11 of its
-40 fixes deleted the broken element.
+**The main score is the safe score**: the AccessGuru violation score decrease,
+counting only fixes the guardrails accept. A fix that removed or hid content,
+added a script or a link, or broke the markup counts as no fix, whichever
+method made it. Two dev-set lessons are behind this:
+
+- the plain metric made AccessGuru look best (0.75) only because 11 of its 40
+  fixes deleted the broken element;
+- `agent_tools`' 0.78 included 7 fixes that were broken HTML.
+
+The plain score and "deletions count as failures" are still in every table.
 
 **A 95% confidence interval for every score.** Imagine the test set had been
 a different 138 pages from the same benchmark: how different could the score
@@ -119,32 +136,45 @@ About 6 to 8 hours of runs in all, mostly unattended, and roughly 20 million
 tokens. Mistral's free tier allows 1 billion a month. Every command resumes
 where it stopped, so it can be split over several sittings.
 
-**Step 0: get the frozen code and check it on your machine**
+**Step 0: get the code and check it on your machine**
 
 ```bash
 git pull
 pip install -e ".[dev]"
 python scripts/check_setup.py
 python -m pytest
-git tag -a test-freeze -m "Code frozen for the test-set runs"
-git push origin test-freeze
 ```
 
-`python -m pytest` should end with "246 passed, 2 skipped" or similar, with
+`python -m pytest` should end with "250 passed, 2 skipped" or similar, with
 no failures. (While the repository is private, GitHub's CI needs Actions
 minutes on your account, so this run is the check on Windows.)
 
-**Step 1: confirm the last fixes on dev** (about 1 hour; the four agent
-methods changed, so `--fresh` re-runs them; unchanged replies come from the
-cache):
+**Step 1: re-run the agent methods on dev** (about half an hour: the prompts
+are unchanged, so most replies come from your cache; only `agent_rag` asks
+the model afresh, because its passages changed). `--fresh`
+replaces the earlier results.
 
 ```bash
-python -m a11y_agent.evaluate run --method agent agent_tools agent_rag agent_guarded --fresh
-python -m a11y_agent.evaluate compare
+python -m a11y_agent.evaluate run --method agent agent_tools agent_guarded agent_rag --fresh
+python -m a11y_agent.evaluate report --save
+python -m a11y_agent.evaluate compare --save
 ```
 
-Expect `agent_guarded` to be much closer to `agent_tools` than the 0.14 gap
-before. If it is not, stop and send me the output before Step 2.
+The table now has a "Safe fixes only" column; `compare` uses it.
+
+Expect, from replaying the model's recorded attempts:
+- `agent_guarded` should get back at least 6 of the 7 lost items;
+- `agent_tools` should keep its score with valid HTML, so its safe score
+  should match its plain score.
+
+Commit `results/` and send me the output. Only then: Step 2.
+
+**The freeze** (after I have confirmed Step 1):
+
+```bash
+git tag -a test-freeze -m "Code frozen for the test-set runs"
+git push origin test-freeze
+```
 
 **Step 2: the AccessGuru test set** (about 4 to 5 hours). `agent_tools` runs
 before `agent_guarded` so the guarded run can reuse its replies:
