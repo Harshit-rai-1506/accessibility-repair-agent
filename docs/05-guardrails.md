@@ -417,6 +417,36 @@ guard:
 The guard's check stays as a second line of defence: a model can still write
 `<main>` before `<html>` by editing the tag itself.
 
+**The dev re-run (28 Oct, commit `dd2e88d`).** Same prompts, so 161 of the
+guarded agent's 165 replies came from the cache:
+
+| Method | Score | Safe score (95% interval) | Resolved | Unsafe fixes |
+|---|---|---|---|---|
+| Agent + tools | 0.76 | 0.76 (0.62–0.89) | 30 | 0 |
+| **Agent + tools + guardrails** | **0.76** | **0.76** (0.62–0.89) | **30** | **0** |
+| Agent + tools + retrieval | 0.70 | 0.68 (0.53–0.82) | 28 | 1 |
+| Agent | 0.68 | 0.61 (0.46–0.76) | 28 | 3 |
+| Zero-shot | 0.61 | 0.56 (0.41–0.71) | 23 | 1 |
+| AccessGuru prompting | 0.75 | 0.37 (0.23–0.52) | 29 | 11 |
+
+- The guarded agent got back 6 of the 7 items (141 still fails for both),
+  exactly as the replay predicted. It now matches `agent_tools` on every item:
+  the guardrails cost nothing here, and only 3 attempts were rejected.
+- `agent_tools` lost 141 (its earlier "fix" depended on the old anchor
+  behaviour) and kept everything else, now as valid HTML: 0.78 → 0.76 on the
+  plain score, but ≈0.64 → 0.76 on the safe score.
+- The safe score shows which methods were getting credit for fixes the
+  guardrails reject. AccessGuru loses half its score (0.75 → 0.37). The plain
+  agent, without the guard, made 3 unsafe fixes.
+- The 10 remaining failures (`evaluate failures`):
+  - 4 fix their target but make `region` fail on a snippet with no landmarks;
+  - 5 still fail their target (three hard colour cases, a page with many
+    images, a list the model kept emptying);
+  - 1 edit did not match the page.
+
+This passed the gate in docs/06-results.md §2: the code was frozen here for
+the test runs.
+
 ---
 
 ## What you can now explain

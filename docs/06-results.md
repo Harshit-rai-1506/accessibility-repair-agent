@@ -169,6 +169,9 @@ Expect, from replaying the model's recorded attempts:
 
 Commit `results/` and send me the output. Only then: Step 2.
 
+*Done 28 Oct: passed (docs/05-guardrails.md §10). The guarded agent matches
+`agent_tools` on every dev item, 0.76 on the safe score.*
+
 **The freeze** (after I have confirmed Step 1):
 
 ```bash

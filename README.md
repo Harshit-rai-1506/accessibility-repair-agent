@@ -8,9 +8,9 @@ guardrails. Runs on free, open-weight models.
 > **Status:** Phases 0–5 are built and tested on Linux and Windows: setup,
 > evaluation harness and baselines, the LangGraph agent, an MCP tool server
 > the agent uses as a client, retrieval over the WCAG documents, and
-> guardrails with human approval. Dev-set results below. Phase 6 (the final,
-> frozen runs on the 138 held-back test items) is set up, behind one more dev
-> check. See the [build plan](docs/PLAN.md).
+> guardrails with human approval. Dev-set results below; the code is frozen
+> and the final runs on the 138 held-back test items (Phase 6) are next. See
+> the [build plan](docs/PLAN.md).
 
 ## The problem
 
@@ -43,35 +43,32 @@ it is structured, and verify every fix by scanning again.
 
 Every method run on the same model and the same 40 items:
 
-| Method | Score decrease | Deletions count as failures (95% interval) | Resolved | Broke another rule | Deleted content | Tokens per item |
-|---|---|---|---|---|---|---|
-| Zero-shot prompt | 0.61 | 0.60 (0.45–0.74) | 23/40 | 7 | 2 | 1,825 |
-| AccessGuru prompting (ASSETS 2025) | 0.75 | **0.47** (0.32–0.62) | 29/40 | 5 | **11** | 25,510 |
-| Our agent (Phase 2) | 0.68 | 0.68 (0.53–0.83) | 28/40 | **0** | **0** | 7,721 |
-| **Our agent with MCP tools** (Phase 3) | **0.78** | **0.78** (0.65–0.90) | **31/40** | 2 | **0** | 15,710 |
-| Agent + tools + WCAG retrieval (Phase 4) | 0.64 | 0.64 (0.49–0.79) | 26/40 | 1 | **0** | 19,760 |
-| Agent + tools + guardrails (Phase 5) | 0.64 | 0.64 (0.48–0.78) | 24/40 | 2 | **0** | 15,916 |
+| Method | Score decrease | Safe score (95% interval) | Resolved | Broke another rule | Deleted content | Unsafe fixes | Tokens per item |
+|---|---|---|---|---|---|---|---|
+| Zero-shot prompt | 0.61 | 0.56 (0.41–0.71) | 23/40 | 7 | 2 | 1 | 1,825 |
+| AccessGuru prompting (ASSETS 2025) | 0.75 | **0.37** (0.23–0.52) | 29/40 | 5 | **11** | **11** | 25,510 |
+| Our agent (Phase 2) | 0.68 | 0.61 (0.46–0.76) | 28/40 | **0** | **0** | 3 | 7,721 |
+| Our agent with MCP tools (Phase 3) | 0.76 | **0.76** (0.62–0.89) | **30/40** | 2 | **0** | **0** | 15,710 |
+| Agent + tools + WCAG retrieval (Phase 4) | 0.70 | 0.68 (0.53–0.82) | 28/40 | **0** | **0** | 1 | 18,084 |
+| **Agent + tools + guardrails** (Phase 5) | 0.76 | **0.76** (0.62–0.89) | **30/40** | 2 | **0** | **0** | 15,584 |
 
 Score decrease is 1 − (violation score after ÷ before), from the AccessGuru
-paper: 1.0 means every target fixed with nothing broken. The metric alone
-rewards deleting the broken element, so the second column scores a fix that
-removed content as no fix: AccessGuru's lead comes from deletions (11 of 40
-items). The agent rows are after two rounds of error analysis
-([docs/02-agent.md §14–15](docs/02-agent.md#14-error-analysis-round-1)).
+paper: 1.0 means every target fixed with nothing broken. The scanner accepts
+"fixes" that delete the broken element, hide it (`aria-hidden="true"`) or
+leave invalid HTML, so the **safe score** counts a fix as no fix if it fails a
+guardrail check (content removed or hidden, a script or link added, broken
+markup), whichever method made it. That is why AccessGuru falls from 0.75 to
+0.37. Intervals are 95%, from the bootstrap; with 40 items they are about
+±0.14 wide, which is why the final comparison uses the 138 held-back items.
+The agent rows are after the dev-set error analyses
+([docs/02-agent.md §14–15](docs/02-agent.md#14-error-analysis-round-1),
+[docs/05-guardrails.md §10](docs/05-guardrails.md#10-dev-results-and-what-they-changed)).
 Retrieval did not help: the passages were on topic, but the agent's failures
-are mechanical, not a lack of WCAG knowledge, and the gap is within what
-chance could do on 40 items
+are mechanical, not a lack of WCAG knowledge
 ([docs/04-retrieval.md §11](docs/04-retrieval.md#11-what-retrieval-did-in-the-agent-dev-results)).
-The guardrails cost nothing on element-level problems (0.72 either way); all
-seven items they lost were page-level fixes that put `<main>` before `<html>`
-or left `<</end>>` in the page, which axe-core accepts and the guardrails
-reject. Counted fairly, with such fixes as no fix (the *safe score*, now in
-every report), `agent_tools` also comes to about 0.64. The edit format now
-makes those wraps valid HTML by construction; the dev re-run comes before
-any test-set run
-([docs/05-guardrails.md §10](docs/05-guardrails.md#10-dev-results-and-what-they-changed)).
-With 40 items the 95% intervals are about ±0.14 wide, which is why the final
-comparison uses the 138 held-back items, with paired tests.
+The guardrails cost nothing on the dev set once the edit format made page
+wraps valid HTML by construction: the guarded agent matches the agent with
+tools on every item, with no unsafe fix.
 Full tables, per-item outcomes
 and the agent's step traces: [results/accessguru-dev](results/accessguru-dev/README.md).
 The test set is held back until the end.
@@ -211,8 +208,8 @@ Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 | 2 | LangGraph agent: scan → fix → verify → retry, with state and checkpoints | Graphs, state, reducers, conditional edges, structured output, checkpoints | ✅ Done (0.68 vs zero-shot 0.60) |
 | 3 | MCP server exposing the scanner, fix checker, rule explanations and a contrast calculator; agent calls them as a client | MCP (tools, resources, prompts, stdio/HTTP), function calling | ✅ Done (0.78, best so far) |
 | 4 | Retrieval over WCAG Understanding docs and Techniques, as a graph node and an MCP tool | Chunking, embeddings, hybrid search, metadata filters, retrieval evaluation | ✅ Done (did not help on dev; kept as method D) |
-| 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | ✅ Done (no cost on element-level fixes; 0/40 false alarms) |
-| 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, confidence intervals, error analysis, reporting | Set up; test runs next |
+| 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | ✅ Done (no cost on dev: 0.76 = agent with tools; 0/40 false alarms) |
+| 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, confidence intervals, error analysis, reporting | Frozen; test runs next |
 
 Details, acceptance criteria and budget for each phase: [docs/PLAN.md](docs/PLAN.md).
 

@@ -389,7 +389,7 @@ def collect_runs(dataset: str, split: str) -> list[tuple[dict, list[dict]]]:
 
 ITEM_COLUMNS = ["id", "rule_id", "category", "page_level", "status", "old_score", "new_score", "target_fixed",
                 "resolved", "introduced", "dropped_content", "text_kept", "elements_kept", "passes", "calls",
-                "input_tokens", "output_tokens", "note", "guard", "trace"]
+                "input_tokens", "output_tokens", "note", "guard", "unsafe", "trace"]
 
 
 def _guard_text(guard: dict | None) -> str:
@@ -414,7 +414,8 @@ def write_items_csv(path: Path, rows: list[dict], method: str) -> None:
         writer = csv.DictWriter(f, fieldnames=ITEM_COLUMNS)
         writer.writeheader()
         for row in rows:
-            out = {k: row.get(k) for k in ITEM_COLUMNS if k not in ("introduced", "trace", "guard")}
+            out = {k: row.get(k) for k in ITEM_COLUMNS if k not in ("introduced", "trace", "guard", "unsafe")}
+            out["unsafe"] = ";".join(row.get("guard_problems") or [])        # guardrail checks the final fix fails
             out["introduced"] = ";".join(row.get("introduced") or [])
             out["guard"] = _guard_text(row.get("guard"))
             out["trace"] = (row.get("response") or "")[:3000] if method.startswith("agent") else ""

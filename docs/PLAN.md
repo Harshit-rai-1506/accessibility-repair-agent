@@ -377,6 +377,13 @@ how well, at what cost, and where it fails.
   Phase 5 runs `agent_tools` is about 0.64 on it, the same as `agent_guarded`.
 - The gate: the dev re-run first; the freeze (tag `test-freeze`) and the test
   runs only after it; every result row records its commit.
+- **Gate passed** (dev re-run, commit `dd2e88d`): agent_guarded 0.76 safe
+  (0.62–0.89) = agent_tools 0.76, identical on every item, 0 unsafe fixes;
+  6 of the 7 page-level items recovered as predicted. Safe scores: agent
+  0.61, agent_rag 0.68, zero_shot 0.56, accessguru 0.37 (11 unsafe fixes).
+  Remaining 10 failures: 4 region side effects on landmark-less snippets,
+  5 target still fails, 1 edit did not match. Code frozen after adding the
+  `unsafe` column to the per-item CSVs (reporting only).
 - `stats.py` and `evaluate compare`: each score with a 95% bootstrap
   interval; paired differences against `agent_tools` with intervals; sign
   tests on resolved flips; cost and speed table (calls, tokens, model and wall
