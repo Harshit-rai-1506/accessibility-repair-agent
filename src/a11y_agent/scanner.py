@@ -184,7 +184,7 @@ class Scanner:
         """
         if self._browser is None:
             raise RuntimeError("use 'async with Scanner() as scanner:'")
-        context = await self._browser.new_context()
+        context = await self._browser.new_context(bypass_csp=True)    # see _run_axe
         try:
             page = await context.new_page()
             page.set_default_timeout(self._timeout_ms)
@@ -221,7 +221,7 @@ class Scanner:
     async def visit(self, url: str, *, allow_url=None, patient: bool = False) -> Snapshot:
         if self._browser is None:
             raise RuntimeError("use 'async with Scanner() as scanner:'")
-        context = await self._browser.new_context()
+        context = await self._browser.new_context(bypass_csp=True)    # see _run_axe
         blocked: list[str] = []
         try:
             page = await context.new_page()
@@ -263,6 +263,15 @@ class Scanner:
             await context.close()
 
     async def _run_axe(self, page) -> ScanResult:
+        """Inject axe-core into the page and run it.
+
+        The browser contexts are opened with ``bypass_csp``: many real sites
+        (flipkart.com, passportindia.gov.in) send a Content-Security-Policy
+        that forbids inline scripts, which would also stop our own axe-core
+        script, the way an auditing extension is not subject to the page's
+        policy. It only affects our local browser. No benchmark snippet sets
+        a policy, so benchmark scans are unchanged.
+        """
         await page.add_script_tag(content=self._axe_source)
         raw = await page.evaluate(_RUN_AXE, self._tags)
         return ScanResult.from_axe(raw)

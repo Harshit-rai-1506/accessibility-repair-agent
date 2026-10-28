@@ -150,7 +150,7 @@ python scripts/check_setup.py
 python -m pytest
 ```
 
-`python -m pytest` should end with "253 passed, 2 skipped" or similar, with
+`python -m pytest` should end with "254 passed, 2 skipped" or similar, with
 no failures. (While the repository is private, GitHub's CI needs Actions
 minutes on your account, so this run is the check on Windows.)
 
@@ -216,9 +216,10 @@ python -m a11y_agent.evaluate failures --dataset access --split test --method ag
 After them, `failures` was corrected to list a fix that passes the scanner but
 fails a guardrail check as a failure ("fixed for the scanner, but fails the
 guardrail checks"), as the safe score does. Before, `agent_tools`' 11 such
-fixes were missing from its list. The four `failures` commands above only
-read saved results (no model calls, a few seconds), so run them once more
-with the current code.*
+fixes were missing from its list. The four reports were made again with the
+corrected code on 28 Oct (commit `aa7f36b`): `agent_tools` now lists 38
+failures on AccessGuru test, 10 of them "fixed for the scanner, but fails the
+guardrail checks".*
 
 **Step 5: real public pages.** The home pages to test are listed in
 `scripts/public_pages.txt`: 12 Indian sites, 5 government, 3 e-commerce, 2
@@ -252,8 +253,10 @@ Results go to `results/public-pages/`:
 The snapshots and the fixed pages go to `runs/public/`. Only your local copy
 is changed; nothing is sent to the sites.
 
-*Not run yet. §5.8 is filled in from `results/public-pages/README.md` once it
-is.*
+*Done 28 Oct (commit `aa7f36b`): 5 of the 12 sites tested, see §5.8. Two of
+the others failed because of a bug in our scanner, since fixed. Run the same
+command again to retry the sites that failed to load (flipkart.com,
+passportindia.gov.in, nykaa.com); the finished ones are kept.*
 
 **Step 6: commit and push**
 
@@ -439,7 +442,9 @@ By rule:
   aria-required-children, aria-allowed-role, aria-text, aria-tooltip-name,
   aria-treeitem-name, aria-progressbar-name, meta-refresh).
 
-28 of the 41 rules were fixed on every item.
+28 of the 41 rules were fixed on every item. On ACCESS the guarded agent's 25 failures split
+the same way: edits did not match 9, broke another rule 6, every attempt
+rejected 5, target still fails 5.
 
 Reading the traces gives four patterns:
 
@@ -525,17 +530,99 @@ the same requests, so its real speed is that of `agent_tools`.
 
 ### 5.8 Real public pages
 
-Not run yet (Step 5). The 12 home pages in `scripts/public_pages.txt`
-cover Indian government, e-commerce, education and hospital sites.
-Government sites are meant to meet WCAG 2.1 AA under GIGW.
+Run 28 Oct on 12 Indian home pages (`scripts/public_pages.txt`): government
+sites, which GIGW requires to meet WCAG 2.1 AA, plus e-commerce, education
+and hospital sites. Five could be tested. The source is
+`results/public-pages/README.md`, with one report per site.
 
-When `results/public-pages/README.md` exists, this section summarises it:
+| Site | Category | Rules failing | Score before → after | Decrease | Rules fixed / tried | Tokens | Time |
+|---|---|---|---|---|---|---|---|
+| snapdeal.com | e-commerce | 7 | 27 → 3 | 0.89 | 6 / 7 | 1.13M | 3 min |
+| mygov.in | government | 9 | 30 → 7 | 0.77 | 7 / 9 | 1.66M | 6 min |
+| aiims.edu | hospital | 9 | 37 → 11 | 0.70 | 6 / 9 | 2.32M | 9 min |
+| iitb.ac.in | education | 6 | 24 → 9 | 0.62 | 4 / 6 | 0.33M | 7 min |
+| du.ac.in | education | 14 | 54 → 29 | 0.46 | 7 / 14 | 0.33M | 29 min |
+| **All five** | | 45 | **172 → 59** | **0.66** | **30 / 45** | 5.8M | 53 min |
 
-- the score before and after on each page;
-- which rules were fixed across pages;
-- the review flags and rejected attempts;
-- the cost per page;
-- which sites could not be tested, and why.
+**It carries over to whole real pages, at a lower rate.** The benchmark
+score was 0.78; on these pages it is 0.66 (median 0.70 per page). Real pages
+are harder than snippets in three ways:
+
+- one rule can cover dozens of elements;
+- some rules depend on structure the model sees only in excerpts;
+- some rules depend on stylesheets that the offline snapshot does not have.
+
+**What it fixed reliably, and what it did not.**
+
+| Rules | Fixed |
+|---|---|
+| image-alt, frame-title, label, select-name, landmark-one-main, landmark-unique, aria-allowed-attr | on every page where they failed (2 or 3 pages each) |
+| heading-order, region, page-has-heading-one, list, link-name | about half |
+| target-size | 1 of 4 |
+| aria-required-children, aria-required-parent, listitem | 0 of 4 |
+
+- **target-size** asks for clickable areas of at least 24 by 24 pixels. On a
+  page without its stylesheets, the scanner measures unstyled links.
+- **aria-required-children, aria-required-parent and listitem** need a menu
+  or list rebuilt, not an attribute added.
+
+**Reading the changes by hand.**
+
+- *Good fixes.* On MyGov, an image whose alt text repeated the link text
+  ("Government of India" next to "GOVERNMENT OF INDIA") got `alt=""`, so a
+  screen reader no longer says it twice. `role="presentation"` was removed
+  from focusable buttons. The selects got labels ("Select a category").
+- *Text a person must check.* The agent writes alt text without seeing the
+  images: officials' names on AIIMS photos (probably from the captions next
+  to them) and product names on Snapdeal. The review flags list every such
+  change. One is weak although the scanner passes it: MyGov's carousel dots
+  were all labelled "Slide", so a screen reader user hears "Slide, Slide,
+  Slide". "Slide 1 of 5" would be the human fix.
+- *A gap in the review flags.* On AIIMS, the target-size attempts added
+  inline padding and `font-size: 16px` to links. That changes the layout,
+  but the flags cover colours, not sizes or spacing. A "changes the layout"
+  flag would catch it.
+- *Guardrails.* The input screen blocked none of the five pages, so there
+  were no false alarms on real pages. Seven attempts were rejected on three
+  pages, all for broken markup.
+
+**Cost and time.**
+
+- *Tokens.* A page that fits in Mistral's 120K-token request is sent whole
+  with every attempt: about 80K tokens per call on AIIMS, MyGov and Snapdeal.
+  Larger pages are cut to the parts around the failing elements: 7K to 15K
+  tokens per call on DU (1 MB) and IIT Bombay (546 KB).
+- *Cost.* So the cost per page ranges from $0.05 to $0.35 on the paid plan
+  (about $0.87 for all five), against $0.002 per benchmark item. Sending
+  excerpts even when the page fits would cut it several times; not done.
+- *Time.* DU took 29 minutes with only 335K tokens. The time most likely
+  went into re-scanning a 1 MB page after each of its 50 attempts.
+
+**Seven sites could not be tested.**
+
+- *Five refused the automated browser.*
+  - india.gov.in, mohfw.gov.in and apollohospitals.com answered HTTP 403;
+  - uidai.gov.in answered HTTP 500;
+  - nykaa.com cut the connection (`ERR_HTTP2_PROTOCOL_ERROR`), as bot
+    protection does.
+
+  The script does not disguise its browser to get past such blocks. It
+  records the refusal and moves on.
+- *Two were a bug in our scanner.* flipkart.com and passportindia.gov.in send
+  a Content-Security-Policy that forbids inline scripts, which also blocked
+  the axe-core script we inject. The scanner now opens its browser with the
+  page's policy bypassed for our own script, as an auditing extension is.
+  No benchmark snippet sets a policy, so the benchmark results are
+  unaffected. Running the command again retries those pages.
+
+**Caveats.**
+
+- One snapshot per site makes these examples, not a sample.
+- The fixed pages are local copies. A site's owner would have to apply the
+  changes, and some, like contrast, belong in the stylesheet rather than the
+  page.
+- The live scores, with stylesheets, differ from the snapshot's: 39 against
+  27 on Snapdeal, 42 against 30 on MyGov.
 
 ### 5.9 How this compares with the paper
 
@@ -570,6 +657,8 @@ directly comparable:
   because they contain none. Phase 5's small set of attacks is the only
   evidence there, and Prompt Guard 2 caught little that the rules missed.
 - **Seven comparisons.** Read the intervals, not single p-values.
+- **Real pages: five sites.** They show the method carries over (0.66), not
+  how well it does on the web in general.
 
 ---
 

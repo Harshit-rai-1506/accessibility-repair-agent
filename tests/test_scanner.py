@@ -143,3 +143,37 @@ def test_a_slow_page_is_snapshot_with_what_has_arrived():
     assert "<h1>Hello</h1>" in page.html and "image-alt" in page.scan.rule_ids
     assert page.status == 200 and page.url == f"{base}/"
     assert missing.status == 404
+
+
+def test_a_page_whose_policy_forbids_inline_scripts_can_still_be_scanned():
+    """flipkart.com and passportindia.gov.in send a Content-Security-Policy that blocked our axe-core script."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    body = b'<!doctype html><html lang="en"><head><title>T</title></head><body><main><h1>T</h1>' \
+           b'<img src="/cat.png"></main></body></html>'
+
+    class Strict(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Security-Policy", "script-src 'self'")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Strict)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    meta = body.decode().replace("<title>", "<meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'self'\"><title>")
+
+    async def go():
+        async with Scanner() as scanner:
+            return (await scanner.snapshot_url(f"http://127.0.0.1:{server.server_port}/", patient=True),
+                    await scanner.scan_html(meta))
+    try:
+        live, offline = asyncio.run(go())
+    finally:
+        server.shutdown()
+    assert "image-alt" in live.scan.rule_ids and "image-alt" in offline.rule_ids

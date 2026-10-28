@@ -8,9 +8,9 @@ guardrails. Runs on free, open-weight models.
 > **Status:** all six phases are built and evaluated: the evaluation harness
 > and baselines, the LangGraph agent, an MCP tool server the agent uses as a
 > client, retrieval over the WCAG documents, guardrails with human approval,
-> and the final runs on 238 held-out test items from two benchmarks (results
-> below). Still to do: a before/after on a few real public pages. See the
-> [build plan](docs/PLAN.md).
+> the final runs on 238 held-out test items from two benchmarks, and a
+> before/after on real Indian home pages (results below). The project is
+> complete. See the [build plan](docs/PLAN.md).
 
 ## The problem
 
@@ -96,6 +96,13 @@ before they were run (tag `test-freeze`).
 - **It held up from dev to test.** The order of the methods is the same on
   all three sets, and the guarded agent scored 0.76 on dev, 0.78 and 0.77 on
   test.
+- **It carries over to real pages, at a lower rate.** The agent ran on five
+  whole Indian home pages: mygov.in, aiims.edu, iitb.ac.in, du.ac.in and
+  snapdeal.com. It cut their violation score from 172 to 59 (0.66) and fixed
+  30 of the 45 failing rules, with no false alarm from the input screen.
+  Seven other sites refused the automated browser, or (two) hit a scanner
+  bug that is now fixed. Details:
+  [results/public-pages](results/public-pages/README.md).
 
 **Where it still fails.** Page-level rules (`region`, `landmark-one-main`,
 `page-has-heading-one`) score 0.61 against 0.84 for element-level rules. Two
@@ -116,6 +123,8 @@ then fails the stricter AAA check.
 - axe-core checks only what can be automated, and nobody judged the quality
   of the new alt text: the agent flags those changes for a person instead.
 - The results come from one model and one run per method.
+- Real pages: only five sites, and on them the agent sends whole pages to the
+  model, which costs up to $0.35 a page.
 
 Full analysis: [docs/06-results.md §5](docs/06-results.md#5-the-results).
 Tables, per-item outcomes and the agent's traces: [results/accessguru-test](results/accessguru-test/README.md),
@@ -160,8 +169,11 @@ The agent rows are after the dev-set error analyses
   that a contrast-solving MCP tool fixed all 25 AAA contrast cases (from
   19), and that retrieval added nothing. The guardrails cost no accuracy
   (+3 points, 0 unsafe fixes).
-- The agent costs $0.22 per 100 pages: 3.5 times cheaper and about 7 times
-  faster than the baseline. The project also handles prompt injection (rule
+- Ran it on real Indian government, university, hospital and e-commerce home
+  pages: it cut their violation score by 66% (172 to 59) and fixed 30 of 45
+  failing rules, with every invented label flagged for a human to review.
+- The agent costs $0.22 per 100 benchmark pages: 3.5 times cheaper and about
+  7 times faster than the baseline. The project also handles prompt injection (rule
   screen plus Llama Prompt Guard 2), SSRF-safe URL scanning, and a
   Windows-specific MCP stdio deadlock, with 250+ tests on Linux and Windows.
 
@@ -221,7 +233,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 255 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 256 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
@@ -307,7 +319,7 @@ Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 | 3 | MCP server exposing the scanner, fix checker, rule explanations and a contrast calculator; agent calls them as a client | MCP (tools, resources, prompts, stdio/HTTP), function calling | ✅ Done (0.78, best so far) |
 | 4 | Retrieval over WCAG Understanding docs and Techniques, as a graph node and an MCP tool | Chunking, embeddings, hybrid search, metadata filters, retrieval evaluation | ✅ Done (did not help on dev; kept as method D) |
 | 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | ✅ Done (no cost on dev: 0.76 = agent with tools; 0/40 false alarms) |
-| 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, confidence intervals, error analysis, reporting | ✅ Done (test: 0.78 safe, 0 unsafe fixes, vs AccessGuru 0.29; public pages to do) |
+| 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, confidence intervals, error analysis, reporting | ✅ Done (test: 0.78 safe, 0 unsafe fixes, vs AccessGuru 0.29; 5 real pages: 0.66) |
 
 Details, acceptance criteria and budget for each phase: [docs/PLAN.md](docs/PLAN.md).
 

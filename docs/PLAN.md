@@ -357,7 +357,7 @@ human-in-the-loop.
 - *Not done, noted:* a browser-rendered check of visible text (CSS classes
   that hide text are only caught by their usual names).
 
-### Phase 6: Results and write-up ✅ done (public pages to do)
+### Phase 6: Results and write-up ✅ done
 
 **Build:** run all methods on the test set; error analysis of 20 failures;
 cost and latency table; before/after report on a few public pages; README
@@ -437,10 +437,30 @@ Safe score, 95% interval:
 
 *Dropped:* repeating A and E on a smaller model (gpt-oss on Groq's free tier
 allows about 200K tokens a day; method E needs about 2M for the test set).
-*Remaining:* the before/after on a few public pages (`scripts/public_pages.py`).
+- **Real pages** (28 Oct, commit `aa7f36b`): 12 Indian home pages listed in
+  `scripts/public_pages.txt`; 5 tested.
+  - The score went from 172 to 59 (0.66, median 0.70 per page) and 30 of 45
+    rules were fixed. Per page: snapdeal 0.89, mygov 0.77, aiims 0.70, iitb
+    0.62, du 0.46.
+  - Reliable: image-alt, frame-title, label, select-name, landmarks,
+    aria-allowed-attr. Not fixed: target-size (1 of 4) and the structural
+    ARIA rules (0 of 4).
+  - Input screen: 0 false alarms. Rejected attempts: 7, all broken markup.
+  - Cost: 0.33M to 2.3M tokens a page; a page that fits Mistral's 120K window
+    is sent whole on every attempt.
+  - Not tested: 4 sites answered 403 or 500, nykaa cut the connection, and
+    flipkart and passportindia hit a scanner bug: their Content-Security-Policy
+    blocked our injected axe-core. The bug is fixed with `bypass_csp`, and a
+    re-run retries them.
+  - Full write-up in 06-results.md §5.8.
+- **Project complete (28 Oct).** The optional extensions below are left as they
+  were.
 *Future work, not done:* strip document tags from text inserted at an
 anchor, a deterministic "wrap in `<main>`" tool for page-level rules, and
-contrast fixes aimed at 7:1 when the page is scanned with AAA rules.
+contrast fixes aimed at 7:1 when the page is scanned with AAA rules; for real
+pages, excerpts even when the page fits the request (cost), numbered labels
+for repeated controls ("Slide 1 of 5"), and a review flag for layout changes
+(padding, font size).
 These would need a new dev round and a fresh held-out set, since these test
 sets have now been read.
 

@@ -4,6 +4,7 @@
     python scripts/public_pages.py --list my_pages.txt      # another list
     python scripts/public_pages.py https://www.example.com https://another.example.org
     python scripts/public_pages.py --fresh                  # redo pages that already have a report
+    python scripts/public_pages.py https://uidai.gov.in/ --fresh    # redo one page
 
 For each address:
 
@@ -302,7 +303,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
-    pages = args.urls or read_list(args.list)
+    listed = read_list(args.list) if args.list.exists() else []
+    known = dict(listed)
+    pages = [(url, known.get(url, "-")) for url in args.urls] or listed      # a listed site keeps its category
     if not pages:
         print(f"No pages: give addresses, or list them in {args.list}.")
         return 1
