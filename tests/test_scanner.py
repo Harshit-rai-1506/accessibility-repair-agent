@@ -104,3 +104,42 @@ def test_scan_url_checks_every_redirect():
         forbidden.shutdown()
     assert "image-alt" in ok.rule_ids                # pages still load and scan with the check on
     assert hits == []                                # the forbidden server was never contacted
+
+
+def test_a_slow_page_is_snapshot_with_what_has_arrived():
+    """Real sites keep loading (ads, trackers): a patient snapshot scans the page instead of timing out."""
+    import threading
+    import time
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Slow(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/never.png":
+                time.sleep(4)                         # longer than the scanner's timeout below
+            status = 404 if self.path == "/missing" else 200
+            self.send_response(status)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(b'<!doctype html><html lang="en"><head><title>T</title></head><body><main>'
+                             b'<h1>Hello</h1><img src="/never.png"></main></body></html>')
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Slow)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_port}"
+
+    async def go():
+        async with Scanner(timeout_ms=1_000) as scanner:
+            with pytest.raises(Exception, match="Timeout"):
+                await scanner.snapshot_url(f"{base}/")             # waits for "load", which never comes in time
+            return await scanner.snapshot_url(f"{base}/", patient=True), \
+                await scanner.snapshot_url(f"{base}/missing", patient=True)
+    try:
+        page, missing = asyncio.run(go())
+    finally:
+        server.shutdown()
+    assert "<h1>Hello</h1>" in page.html and "image-alt" in page.scan.rule_ids
+    assert page.status == 200 and page.url == f"{base}/"
+    assert missing.status == 404

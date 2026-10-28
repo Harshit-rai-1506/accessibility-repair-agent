@@ -150,7 +150,7 @@ python scripts/check_setup.py
 python -m pytest
 ```
 
-`python -m pytest` should end with "251 passed, 2 skipped" or similar, with
+`python -m pytest` should end with "253 passed, 2 skipped" or similar, with
 no failures. (While the repository is private, GitHub's CI needs Actions
 minutes on your account, so this run is the check on Windows.)
 
@@ -220,15 +220,40 @@ fixes were missing from its list. The four `failures` commands above only
 read saved results (no model calls, a few seconds), so run them once more
 with the current code.*
 
-**Step 5: a few real pages.** Choose 3 to 5 public pages you are allowed to
-test, for example your university's or your city's home page:
+**Step 5: real public pages.** The home pages to test are listed in
+`scripts/public_pages.txt`: 12 Indian sites, 5 government, 3 e-commerce, 2
+education and 2 hospitals. Edit the list freely: one address per line, then
+a category, and `#` switches a line off.
 
 ```bash
-python scripts/public_pages.py https://first.example https://second.example
+python scripts/public_pages.py                       # every page in the list
+python scripts/public_pages.py https://some.site/    # or just these
 ```
 
-*Not run yet: there is no `results/public-pages/` folder. §5.8 is filled in
-once it is.*
+What it does for each page:
+
+- loads it once in Chromium, as a visitor's browser would, and gives a slow
+  site up to a minute;
+- skips it, saying why, if the site answers with an error or a bot check;
+- runs the guarded agent on the snapshot, fixing up to 15 rules, most severe
+  first.
+
+Budget roughly 3 to 10 minutes and a few hundred thousand tokens per page,
+so 1 to 2 hours for the list. A page that is done is not redone when you run
+the command again, and one that failed to load is tried again, so it can be
+split over sittings. Add `--fresh` to redo everything.
+
+Results go to `results/public-pages/`:
+
+- `README.md`: one table over all pages;
+- `<site>.md`: the before/after for each page;
+- `<site>.json`: the numbers.
+
+The snapshots and the fixed pages go to `runs/public/`. Only your local copy
+is changed; nothing is sent to the sites.
+
+*Not run yet. §5.8 is filled in from `results/public-pages/README.md` once it
+is.*
 
 **Step 6: commit and push**
 
@@ -500,9 +525,17 @@ the same requests, so its real speed is that of `agent_tools`.
 
 ### 5.8 Real public pages
 
-Not run yet (Step 5). When `results/public-pages/` exists, its reports go
-here: the score before and after, what happened to each rule, the review
-flags and the cost.
+Not run yet (Step 5). The 12 home pages in `scripts/public_pages.txt`
+cover Indian government, e-commerce, education and hospital sites.
+Government sites are meant to meet WCAG 2.1 AA under GIGW.
+
+When `results/public-pages/README.md` exists, this section summarises it:
+
+- the score before and after on each page;
+- which rules were fixed across pages;
+- the review flags and rejected attempts;
+- the cost per page;
+- which sites could not be tested, and why.
 
 ### 5.9 How this compares with the paper
 

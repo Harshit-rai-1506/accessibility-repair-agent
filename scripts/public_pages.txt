@@ -1,0 +1,28 @@
+# Real public pages for the before/after (Phase 6, Step 5): python scripts/public_pages.py
+#
+# One page per line: the address, then a category. Lines starting with # are skipped,
+# so you can switch a site off by putting # in front of it, or add your own.
+#
+# Indian government sites must follow GIGW, which requires WCAG 2.1 level AA;
+# the Rights of Persons with Disabilities Act 2016 covers private sites too.
+
+# Government
+https://www.india.gov.in/              government
+https://www.mygov.in/                  government
+https://uidai.gov.in/                  government
+https://www.passportindia.gov.in/      government
+https://www.mohfw.gov.in/              government
+
+# E-commerce (these often turn automated browsers away; the script then reports
+# "bot check" and moves on rather than scoring the challenge page)
+https://www.flipkart.com/              e-commerce
+https://www.snapdeal.com/              e-commerce
+https://www.nykaa.com/                 e-commerce
+
+# Education
+https://www.iitb.ac.in/                education
+https://www.du.ac.in/                  education
+
+# Hospitals
+https://www.aiims.edu/                 hospital
+https://www.apollohospitals.com/       hospital

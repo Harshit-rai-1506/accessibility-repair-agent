@@ -221,7 +221,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 253 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 255 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
@@ -274,6 +274,12 @@ python -m a11y_agent.evaluate run --method agent_guarded     # dev split, agent_
 python -m a11y_agent.evaluate report                         # compare everything run so far
 python -m a11y_agent.evaluate compare --save                 # 95% intervals, paired tests, cost and speed
 python -m a11y_agent.evaluate failures --method agent_guarded --save   # why items were not fixed
+```
+
+The guarded agent on real public home pages (the list is in `scripts/public_pages.txt`):
+
+```bash
+python scripts/public_pages.py                               # writes results/public-pages/README.md and one report per site
 ```
 
 The final runs on the test sets (Phase 6), their analysis, and a before/after on real public pages:

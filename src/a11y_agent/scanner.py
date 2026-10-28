@@ -25,9 +25,11 @@ import re
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import urljoin
 
 from playwright.async_api import Browser, Playwright, async_playwright
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from .config import settings
 
@@ -133,6 +135,14 @@ class BlockedRequest(Exception):
     """A page asked for an address the scan is not allowed to reach (see ``Scanner.scan_url``)."""
 
 
+class Snapshot(NamedTuple):
+    """A live page as the browser built it."""
+    html: str                  # the DOM after the page's scripts ran
+    scan: ScanResult           # axe-core on the live page (with its stylesheets and images)
+    status: int | None         # HTTP status of the page itself (None if the browser had no response)
+    url: str                   # where the page ended up, after redirects
+
+
 class Scanner:
     """Keeps one Chromium browser open and scans many pages with it.
 
@@ -196,14 +206,19 @@ class Scanner:
         asking, so each request is fetched with redirects off, the target
         checked, and the redirect handed back to the browser.)
         """
-        _, result = await self.visit(url, allow_url=allow_url)
-        return result
+        return (await self.visit(url, allow_url=allow_url)).scan
 
-    async def snapshot_url(self, url: str, *, allow_url=None) -> tuple[str, ScanResult]:
-        """The page's HTML as the browser built it (after its scripts ran), and its live scan."""
-        return await self.visit(url, allow_url=allow_url)
+    async def snapshot_url(self, url: str, *, allow_url=None, patient: bool = False) -> Snapshot:
+        """The page's HTML as the browser built it (after its scripts ran), its live scan, and its HTTP status.
 
-    async def visit(self, url: str, *, allow_url=None) -> tuple[str, ScanResult]:
+        ``patient``: for real sites that are slow or never stop loading (ads,
+        trackers, chat widgets). Wait for the HTML, then for the "load" event
+        and a quiet network as long as the timeout allows, and scan whatever
+        has arrived by then instead of failing.
+        """
+        return await self.visit(url, allow_url=allow_url, patient=patient)
+
+    async def visit(self, url: str, *, allow_url=None, patient: bool = False) -> Snapshot:
         if self._browser is None:
             raise RuntimeError("use 'async with Scanner() as scanner:'")
         context = await self._browser.new_context()
@@ -229,15 +244,21 @@ class Scanner:
                     await route.fulfill(response=response)
                 await page.route("**/*", check)
             try:
-                await page.goto(url, wait_until="load")
+                response = await page.goto(url, wait_until="domcontentloaded" if patient else "load")
             except Exception as error:
                 if blocked:
                     raise BlockedRequest(f"blocked a request to {blocked[0]}") from error
                 raise
+            if patient:
+                for state, timeout in (("load", self._timeout_ms), ("networkidle", 5_000)):
+                    try:
+                        await page.wait_for_load_state(state, timeout=timeout)
+                    except PlaywrightTimeoutError:
+                        pass                    # scan what has arrived
             if blocked and page.url in blocked:
                 raise BlockedRequest(f"blocked a request to {blocked[0]}")
             html = await page.content()
-            return html, await self._run_axe(page)
+            return Snapshot(html, await self._run_axe(page), response.status if response else None, page.url)
         finally:
             await context.close()
 

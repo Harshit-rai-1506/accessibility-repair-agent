@@ -172,13 +172,51 @@ def test_public_page_before_and_after(tmp_path):
     public_pages = _load_public_pages()
     llm = ToolModel(replies=[submit(('<img src="cat.png">', '<img src="cat.png" alt="A cat">'))])
     try:
-        code = asyncio.run(public_pages.repair([f"http://127.0.0.1:{server.server_port}/"], "fake:model", 5,
+        url = f"http://127.0.0.1:{server.server_port}/"
+        code = asyncio.run(public_pages.repair([(url, "shop")], "fake:model", 5,
                                                results_dir=tmp_path / "results", runs_dir=tmp_path / "runs", llm=llm))
+        again = asyncio.run(public_pages.repair([(url, "shop")], "fake:model", 5,       # done pages are skipped
+                                                results_dir=tmp_path / "results", runs_dir=tmp_path / "runs",
+                                                llm=ToolModel(replies=[])))
     finally:
         server.shutdown()
-    assert code == 0
-    report = next((tmp_path / "results").glob("*.md")).read_text(encoding="utf-8")
+    assert code == 0 and again == 0
+    report = next(p for p in (tmp_path / "results").glob("*.md") if p.name != "README.md").read_text(encoding="utf-8")
     assert "**Violation score: 5 -> 0**" in report and "| image-alt | fixed | 1 |" in report
     assert 'alt="A cat"' in report                                           # the diff
     assert "added_text_alternative" not in report and "screen readers hear" in report   # the flag, in words
     assert next((tmp_path / "runs" / "public").glob("*.fixed.html")).read_text(encoding="utf-8").count('alt="A cat"') == 1
+    summary = (tmp_path / "results" / "README.md").read_text(encoding="utf-8")
+    assert "| shop | " in summary and "| 1 | 5 → 0 | 1.00 | 1 / 1 | 0 | 0 |" in summary   # rules, score, fixed
+    assert "| image-alt | 1 | 1 | 0 | 0 |" in summary
+
+
+def test_public_pages_list_bot_checks_and_summary(tmp_path):
+    public_pages = _load_public_pages()
+    listing = tmp_path / "pages.txt"
+    listing.write_text("# a comment\n\nhttps://www.india.gov.in/   government\nhttps://a.example/\n"
+                       "https://b.example/\te-commerce\n", encoding="utf-8")
+    assert public_pages.read_list(listing) == [("https://www.india.gov.in/", "government"),
+                                               ("https://a.example/", "-"), ("https://b.example/", "e-commerce")]
+    assert public_pages.read_list(public_pages.DEFAULT_LIST)               # the shipped list parses
+
+    page = "<html><body><main><h1>Shop</h1>" + "<p>Lots of products and offers.</p>" * 80 + "</main></body></html>"
+    assert public_pages.site_problem(page, 200) is None
+    assert public_pages.site_problem(page + "<p>Enter the captcha to log in</p>", 200) is None   # long real page
+    assert "HTTP 403" in public_pages.site_problem(page, 403)
+    assert "bot check" in public_pages.site_problem("<h1>Access Denied</h1><p>Reference #18.2f</p>", 200)
+    assert "bot check" in public_pages.site_problem("<title>Just a moment...</title><p>Checking your browser</p>", 200)
+    assert "almost no text" in public_pages.site_problem("<div id='root'></div><script>app()</script>", 200)
+
+    done = public_pages.record("https://a.example/", "hospital", "m", status="repaired", live_score=30,
+                               before_rules=6, before_score=20, after_score=5, after_rules=2, attempted=5, fixed=4,
+                               improved=0, tokens=12000, seconds=95, rejected={"broken_markup": 1},
+                               flags={"adds_landmarks": 1, "changed_colours": 2},
+                               outcomes=[{"rule_id": "image-alt", "status": "fixed", "attempts": 1},
+                                         {"rule_id": "region", "status": "not_fixed", "attempts": 3}])
+    blocked = public_pages.record("https://b.example/", "e-commerce", "m", status="site_blocked",
+                                  note="the site showed a bot check instead of the page")
+    text = public_pages.summary([done, blocked])
+    assert "| [a.example](a.example.md) | hospital | 30 | 6 | 20 → 5 | 0.75 | 4 / 5 | 2 | 1 | 3 | 12,000 | 1:35 |" in text
+    assert "1 page(s) with violations: violation score 20 → 5 (decrease 0.75" in text and "| region | 1 | 0 | 0 | 1 |" in text
+    assert "- https://b.example/ (e-commerce): the site showed a bot check" in text
