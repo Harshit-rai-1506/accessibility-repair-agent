@@ -5,12 +5,12 @@ and **proves each fix worked by re-scanning the page**. Built with LangGraph,
 an MCP tool server, retrieval over the official WCAG documentation, and
 guardrails. Runs on free, open-weight models.
 
-> **Status:** Phases 0–5 are built and tested on Linux and Windows: setup,
-> evaluation harness and baselines, the LangGraph agent, an MCP tool server
-> the agent uses as a client, retrieval over the WCAG documents, and
-> guardrails with human approval. Dev-set results below; the code is frozen
-> and the final runs on the 138 held-back test items (Phase 6) are next. See
-> the [build plan](docs/PLAN.md).
+> **Status:** all six phases are built and evaluated: the evaluation harness
+> and baselines, the LangGraph agent, an MCP tool server the agent uses as a
+> client, retrieval over the WCAG documents, guardrails with human approval,
+> and the final runs on 238 held-out test items from two benchmarks (results
+> below). Still to do: a before/after on a few real public pages. See the
+> [build plan](docs/PLAN.md).
 
 ## The problem
 
@@ -39,39 +39,131 @@ it is structured, and verify every fix by scanning again.
 - *Constraint:* free open-weight models: OpenAI's gpt-oss-120b on Groq, and
   Mistral Small 4 on Mistral's API. Methods are compared on the same model.
 
-## Results so far (dev set, 40 items, Mistral Small 4)
+## Results (held-out test sets, Mistral Small 4)
 
-Every method run on the same model and the same 40 items:
+Every method runs on the same open-weight model and the same items. The test
+items were never looked at while the agent was built, and the code was frozen
+before they were run (tag `test-freeze`).
 
-| Method | Score decrease | Safe score (95% interval) | Resolved | Broke another rule | Deleted content | Unsafe fixes | Tokens per item |
-|---|---|---|---|---|---|---|---|
-| Zero-shot prompt | 0.61 | 0.56 (0.41–0.71) | 23/40 | 7 | 2 | 1 | 1,825 |
-| AccessGuru prompting (ASSETS 2025) | 0.75 | **0.37** (0.23–0.52) | 29/40 | 5 | **11** | **11** | 25,510 |
-| Our agent (Phase 2) | 0.68 | 0.61 (0.46–0.76) | 28/40 | **0** | **0** | 3 | 7,721 |
-| Our agent with MCP tools (Phase 3) | 0.76 | **0.76** (0.62–0.89) | **30/40** | 2 | **0** | **0** | 15,710 |
-| Agent + tools + WCAG retrieval (Phase 4) | 0.70 | 0.68 (0.53–0.82) | 28/40 | **0** | **0** | 1 | 18,084 |
-| **Agent + tools + guardrails** (Phase 5) | 0.76 | **0.76** (0.62–0.89) | **30/40** | 2 | **0** | **0** | 15,584 |
+| Method | AccessGuru test, 138 items | ACCESS, 100 items | Plain score (AccessGuru test) | Unsafe fixes (both sets) | Cost per 100 pages |
+|---|---|---|---|---|---|
+| Zero-shot prompt | 0.47 (0.38–0.57) | 0.62 (0.51–0.72) | 0.55 | 30 | $0.08 |
+| AccessGuru prompting (ASSETS 2025) | 0.29 (0.21–0.37) | 0.42 (0.32–0.52) | 0.75 | **111** | $0.78 |
+| Our agent: verify-and-retry loop | 0.69 (0.61–0.76) | – | 0.73 | 8 | $0.13 |
+| + MCP tools | 0.75 (0.68–0.82) | 0.77 (0.69–0.85) | **0.81** | 16 | $0.22 |
+| + tools + WCAG retrieval | 0.73 (0.66–0.80) | – | 0.77 | 6 | $0.27 |
+| **+ tools + guardrails** | **0.78 (0.70–0.84)** | **0.77 (0.69–0.85)** | 0.78 | **0** | $0.22 |
 
-Score decrease is 1 − (violation score after ÷ before), from the AccessGuru
-paper: 1.0 means every target fixed with nothing broken. The scanner accepts
-"fixes" that delete the broken element, hide it (`aria-hidden="true"`) or
-leave invalid HTML, so the **safe score** counts a fix as no fix if it fails a
-guardrail check (content removed or hidden, a script or link added, broken
-markup), whichever method made it. That is why AccessGuru falls from 0.75 to
-0.37. Intervals are 95%, from the bootstrap; with 40 items they are about
-±0.14 wide, which is why the final comparison uses the 138 held-back items.
+**How to read the table**
+
+- *Scores.* The first two columns are the **safe score** with its 95%
+  bootstrap interval. The score is the violation score decrease from the
+  AccessGuru paper (1.0 means every violation fixed and nothing broken),
+  counting a fix as no fix if it deleted or hid content, added a script or a
+  link, or left invalid HTML, whichever method made it. The scanner accepts
+  such "fixes", so the *plain score* rewards them.
+- *Unsafe fixes.* The number of items, across both test sets, whose final
+  page did any of those things. The rows with "–" were run on AccessGuru test
+  only, to save quota, so their count covers that set alone.
+- *Cost.* What Mistral's paid plan would charge for 100 AccessGuru test pages.
+  The runs themselves used the free tier.
+
+**What we found**
+
+- **The guarded agent is the best method on both test sets, and none of its
+  changes to the 238 test pages is unsafe.** It beats the published AccessGuru method by +0.49
+  (+0.39 to +0.58) on AccessGuru test and by +0.35 (+0.24 to +0.47) on ACCESS.
+  It beats a zero-shot prompt by +0.30 and +0.15. All of these are paired on
+  the same items.
+- **Most of the published method's score comes from unsafe fixes.** On the plain score
+  it looks level with the agent (0.75 against 0.78, and 0.81 against 0.77 on
+  ACCESS). But in nearly half the items (68 of 138, and 43 of 100) its
+  rewrite removed, hid or broke something, and the scanner counted that as a
+  fix.
+- **Verification beats knowledge.** The verify-and-retry loop added +0.21
+  (+0.11 to +0.31), the largest gain of any part. MCP tools added +0.06, most
+  clearly on AAA colour contrast: 25 of 25 items fixed, against 19 without the
+  contrast tool. WCAG retrieval added nothing (−0.02, −0.08 to +0.05), on dev
+  as on test.
+- **Safety cost nothing.** The guardrails changed the score by +0.03 (+0.01
+  to +0.05) on AccessGuru test and by 0.00 on ACCESS. Their rejections
+  steered the model to valid fixes on 4 items and never cost one. Without
+  them, the agent with tools scores higher on the plain score (0.81) only
+  because of 11 fixes that are invalid HTML.
+- **Cheap and fast.** At $0.22 per 100 pages and a median of about 4 seconds
+  of model time per page, it is 3.5 times cheaper and about 7 times faster
+  than the published method.
+- **It held up from dev to test.** The order of the methods is the same on
+  all three sets, and the guarded agent scored 0.76 on dev, 0.78 and 0.77 on
+  test.
+
+**Where it still fails.** Page-level rules (`region`, `landmark-one-main`,
+`page-has-heading-one`) score 0.61 against 0.84 for element-level rules. Two
+causes stand out:
+
+- to wrap a page in `<main>`, the model writes a whole `<html><body>`
+  skeleton. The guardrails reject the second `<html>`, but the model often
+  repeats it;
+- a new `<h1>` placed outside a landmark breaks another rule.
+
+On long pages, the model sometimes miscopies the text it wants to replace.
+On colour contrast, it often picks the lowest colour that passes AA, which
+then fails the stricter AAA check.
+
+**Limitations.**
+
+- The benchmarks are snippets, not whole sites.
+- axe-core checks only what can be automated, and nobody judged the quality
+  of the new alt text: the agent flags those changes for a person instead.
+- The results come from one model and one run per method.
+
+Full analysis: [docs/06-results.md §5](docs/06-results.md#5-the-results).
+Tables, per-item outcomes and the agent's traces: [results/accessguru-test](results/accessguru-test/README.md),
+[results/access-test](results/access-test/README.md) and the dev set,
+[results/accessguru-dev](results/accessguru-dev/README.md).
+
+<details>
+<summary>Dev-set results (40 items), used to build and tune the agent</summary>
+
+| Method | Score decrease | Safe score (95% interval) | Resolved | Unsafe fixes | Tokens per item |
+|---|---|---|---|---|---|
+| Zero-shot prompt | 0.61 | 0.56 (0.41–0.71) | 23/40 | 1 | 1,825 |
+| AccessGuru prompting (ASSETS 2025) | 0.75 | 0.37 (0.23–0.52) | 29/40 | 11 | 25,510 |
+| Our agent (Phase 2) | 0.68 | 0.61 (0.46–0.76) | 28/40 | 3 | 7,721 |
+| Our agent with MCP tools (Phase 3) | 0.76 | 0.76 (0.62–0.89) | 30/40 | 0 | 15,710 |
+| Agent + tools + WCAG retrieval (Phase 4) | 0.70 | 0.68 (0.53–0.82) | 28/40 | 1 | 18,084 |
+| Agent + tools + guardrails (Phase 5) | 0.76 | 0.76 (0.62–0.89) | 30/40 | 0 | 15,584 |
+
 The agent rows are after the dev-set error analyses
 ([docs/02-agent.md §14–15](docs/02-agent.md#14-error-analysis-round-1),
 [docs/05-guardrails.md §10](docs/05-guardrails.md#10-dev-results-and-what-they-changed)).
-Retrieval did not help: the passages were on topic, but the agent's failures
-are mechanical, not a lack of WCAG knowledge
-([docs/04-retrieval.md §11](docs/04-retrieval.md#11-what-retrieval-did-in-the-agent-dev-results)).
-The guardrails cost nothing on the dev set once the edit format made page
-wraps valid HTML by construction: the guarded agent matches the agent with
-tools on every item, with no unsafe fix.
-Full tables, per-item outcomes
-and the agent's step traces: [results/accessguru-dev](results/accessguru-dev/README.md).
-The test set is held back until the end.
+
+</details>
+
+## For a CV
+
+- Built an AI agent that repairs WCAG accessibility violations in web pages
+  (LangGraph, an MCP tool server, hybrid RAG over the W3C documents,
+  guardrails with human approval) on an open-weight model. On 138 held-out
+  benchmark pages it removed **78% of the violation score (95% CI 70–84%)
+  with zero unsafe fixes**, against 29% for the published AccessGuru method
+  (ASSETS 2025) on the same model. The result replicated on a second
+  benchmark (77% against 42%).
+- Designed the evaluation before the final runs:
+  - a frozen dev/test split;
+  - a metric that refuses "fixes" made by deleting, hiding or breaking
+    content (the published method scored 0.75 on the plain metric, 0.29 on
+    it);
+  - bootstrap confidence intervals, paired tests and ablations;
+  - error analysis from step traces.
+- Showed by ablation that scanner-verified retries matter most (+21 points),
+  that a contrast-solving MCP tool fixed all 25 AAA contrast cases (from
+  19), and that retrieval added nothing. The guardrails cost no accuracy
+  (+3 points, 0 unsafe fixes).
+- The agent costs $0.22 per 100 pages: 3.5 times cheaper and about 7 times
+  faster than the baseline. The project also handles prompt injection (rule
+  screen plus Llama Prompt Guard 2), SSRF-safe URL scanning, and a
+  Windows-specific MCP stdio deadlock, with 250+ tests on Linux and Windows.
 
 ## How it works
 
@@ -129,7 +221,7 @@ cp .env.example .env                        # Windows: copy .env.example .env
 # .env stays on your laptop: never add it through the GitHub website
 
 python scripts/check_setup.py               # every line should say OK
-python -m pytest                            # 252 tests (add -m "not slow" to skip the 1-2 minute one)
+python -m pytest                            # 253 tests (add -m "not slow" to skip the 1-2 minute one)
 python -m a11y_agent.loaders                # resources as LangChain Documents
 python -m a11y_agent.scanner examples/broken_page.html
 ```
@@ -184,7 +276,7 @@ python -m a11y_agent.evaluate compare --save                 # 95% intervals, pa
 python -m a11y_agent.evaluate failures --method agent_guarded --save   # why items were not fixed
 ```
 
-The final runs (Phase 6) and a before/after on real public pages:
+The final runs on the test sets (Phase 6), their analysis, and a before/after on real public pages:
 [docs/06-results.md](docs/06-results.md).
 
 Runs resume where they stopped, and every model reply is cached, so
@@ -209,7 +301,7 @@ Step-by-step explanations: [docs/00-setup.md](docs/00-setup.md) (setup),
 | 3 | MCP server exposing the scanner, fix checker, rule explanations and a contrast calculator; agent calls them as a client | MCP (tools, resources, prompts, stdio/HTTP), function calling | ✅ Done (0.78, best so far) |
 | 4 | Retrieval over WCAG Understanding docs and Techniques, as a graph node and an MCP tool | Chunking, embeddings, hybrid search, metadata filters, retrieval evaluation | ✅ Done (did not help on dev; kept as method D) |
 | 5 | Guardrails on input, output and actions, plus human approval | Prompt injection, validation, human-in-the-loop | ✅ Done (no cost on dev: 0.76 = agent with tools; 0/40 false alarms) |
-| 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, confidence intervals, error analysis, reporting | Frozen; test runs next |
+| 6 | Full benchmark run, ablations, cost and latency, write-up | Experiment design, confidence intervals, error analysis, reporting | ✅ Done (test: 0.78 safe, 0 unsafe fixes, vs AccessGuru 0.29; public pages to do) |
 
 Details, acceptance criteria and budget for each phase: [docs/PLAN.md](docs/PLAN.md).
 

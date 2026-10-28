@@ -357,7 +357,7 @@ human-in-the-loop.
 - *Not done, noted:* a browser-rendered check of visible text (CSS classes
   that hide text are only caught by their usual names).
 
-### Phase 6: Results and write-up (set up 28 Oct; runs next)
+### Phase 6: Results and write-up ✅ done (public pages to do)
 
 **Build:** run all methods on the test set; error analysis of 20 failures;
 cost and latency table; before/after report on a few public pages; README
@@ -393,12 +393,56 @@ how well, at what cost, and where it fails.
   20 listed for reading.
 - `evaluate run --method a b c`: several methods in one command.
 - `scripts/public_pages.py`: before/after on real public pages.
-- Guide: [docs/06-results.md](06-results.md) (the run plan, step by step). 252 tests.
+- Guide: [docs/06-results.md](06-results.md) (the run plan, step by step, and the results).
+
+- `evaluate failures` corrected after the runs: an item counts as a failure
+  unless it was resolved *safely* (as in the safe score), so `agent_tools`'
+  fixes that pass axe-core with invalid HTML are listed. Reporting only. 253
+  tests.
+
+**Measured (28 Oct, commit `fec5b70`, every row from code `1075c0e`).**
+Safe score, 95% interval:
+
+| Method | AccessGuru test (138) | ACCESS (100) |
+|---|---|---|
+| zero_shot | 0.47 (0.38–0.57) | 0.62 (0.51–0.72) |
+| accessguru | 0.29 (0.21–0.37) | 0.42 (0.32–0.52) |
+| agent | 0.69 (0.61–0.76) | – |
+| agent_tools | 0.75 (0.68–0.82) | 0.77 (0.69–0.85) |
+| agent_rag | 0.73 (0.66–0.80) | – |
+| agent_guarded | **0.78 (0.70–0.84)** | **0.77 (0.69–0.85)** |
+
+- The guarded agent is best on both sets, with 0 unsafe fixes on 238 items.
+- Paired against it:
+  - accessguru is −0.49 (−0.58 to −0.39), and on ACCESS −0.35;
+  - zero_shot is −0.30, and on ACCESS −0.15;
+  - agent_tools is −0.03 (−0.05 to −0.01) with flips 0/4, and identical on
+    ACCESS.
+- The ablation, paired on AccessGuru test:
+  - the loop: +0.21 (+0.11 to +0.31);
+  - tools: +0.06 (−0.02 to +0.14); AAA contrast went from 19/25 to 25/25;
+  - retrieval: −0.02 (−0.08 to +0.05);
+  - guardrails: +0.03 (+0.01 to +0.05).
+- On the plain score, accessguru reaches 0.75 and 0.81. In 68 of 138 and
+  43 of 100 items its rewrite deleted, hid or broke something.
+- Page-level rules: 0.61 safe, against 0.84 for element-level ones. The model
+  writes a second `<html>` when wrapping a page in `<main>` and repeats it
+  after the guard rejects it; a new `<h1>` outside landmarks breaks `region`.
+- Cost on the paid plan: $0.22 per 100 pages, against $0.78 for accessguru.
+- Guardrails:
+  - input screen: 0/238 pages blocked;
+  - rejections: on 17/138 and 9/100 items (almost all broken markup);
+  - review flags: on 95/138 and 62/100 changes.
+- Full analysis: [06-results.md §5](06-results.md#5-the-results).
 
 *Dropped:* repeating A and E on a smaller model (gpt-oss on Groq's free tier
 allows about 200K tokens a day; method E needs about 2M for the test set).
-*Remaining:* the user's runs (dev confirmation, AccessGuru test, ACCESS,
-public pages), then the write-up.
+*Remaining:* the before/after on a few public pages (`scripts/public_pages.py`).
+*Future work, not done:* strip document tags from text inserted at an
+anchor, a deterministic "wrap in `<main>`" tool for page-level rules, and
+contrast fixes aimed at 7:1 when the page is scanned with AAA rules.
+These would need a new dev round and a fresh held-out set, since these test
+sets have now been read.
 
 ### Optional extensions
 

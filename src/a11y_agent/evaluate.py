@@ -526,10 +526,17 @@ def failure_kind(row: dict) -> str:
 
 
 def failures_report(rows: list[dict], method: str, limit: int = 20) -> str:
-    """The failures of one run: how many of each kind, then the first ``limit`` with their last problem."""
-    failed = [r for r in rows if r["old_score"] is not None and not (r["resolved"] and not r.get("dropped_content"))]
+    """The failures of one run: how many of each kind, then the first ``limit`` with their last problem.
+
+    A failure is any item not resolved *safely* (``stats.resolved``), as in the
+    safe score: a fix the scanner accepts but that removed content or fails a
+    guardrail check is listed, as "unsafe" or "deleted".
+    """
+    from . import stats
+    failed = [r for r in rows if r["old_score"] is not None and not stats.resolved(r)]
     kinds = Counter(failure_kind(r) for r in failed)
-    lines = [f"{len(failed)} of {sum(r['old_score'] is not None for r in rows)} items not resolved by {method}.", "",
+    lines = [f"{len(failed)} of {sum(r['old_score'] is not None for r in rows)} items not resolved safely by {method}.",
+             "",
              "| Why | Items |", "|---|---|"]
     lines += [f"| {FAILURE_KINDS[k]} | {n} |" for k, n in kinds.most_common()]
     lines += ["", "| Item | Rule | Page-level | Why | Last step | Guardrails |", "|---|---|---|---|---|---|"]

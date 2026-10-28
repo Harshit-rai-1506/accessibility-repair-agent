@@ -109,8 +109,16 @@ def test_failures_are_sorted_by_why(kwargs, kind):
 def test_failures_report_counts_and_lists():
     rows = [row(1), row(2, new=5, response="propose: edits could not be applied: Edit 1"), row(3, dropped=True)]
     text = failures_report(rows, "agent", limit=5)
-    assert text.startswith("2 of 3 items not resolved by agent.")
+    assert text.startswith("2 of 3 items not resolved safely by agent.")
     assert "| edits did not match the page | 1 |" in text and "| t-003 | image-alt | no | deleted content |" in text
+
+
+def test_failures_report_lists_unsafe_fixes_as_failures():
+    """agent_tools' test run: 11 fixes passed axe-core with broken HTML; they belong in its failure list."""
+    rows = [row(1), row(2, problems=["broken_markup"])]
+    text = failures_report(rows, "agent_tools")
+    assert text.startswith("1 of 2 items not resolved safely by agent_tools.")
+    assert "| fixed for the scanner, but fails the guardrail checks | 1 |" in text and "| t-002 |" in text
 
 
 def test_every_result_row_records_the_code_version():
