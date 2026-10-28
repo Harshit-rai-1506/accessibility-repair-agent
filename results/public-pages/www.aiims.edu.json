@@ -1,0 +1,82 @@
+{
+  "url": "https://www.aiims.edu/",
+  "name": "www.aiims.edu",
+  "category": "hospital",
+  "checked": "2026-10-28",
+  "model": "mistralai:mistral-small-2603",
+  "status": "repaired",
+  "http_status": 200,
+  "html_kb": 238,
+  "live_score": 35,
+  "live_rules": 9,
+  "before_score": 37,
+  "after_score": 11,
+  "before_rules": 9,
+  "after_rules": 3,
+  "attempted": 9,
+  "fixed": 6,
+  "improved": 0,
+  "outcomes": [
+    {
+      "rule_id": "image-alt",
+      "status": "fixed",
+      "attempts": 2
+    },
+    {
+      "rule_id": "label",
+      "status": "fixed",
+      "attempts": 3
+    },
+    {
+      "rule_id": "select-name",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "color-contrast-enhanced",
+      "status": "fixed",
+      "attempts": 2
+    },
+    {
+      "rule_id": "frame-title",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "link-name",
+      "status": "not_fixed",
+      "attempts": 3
+    },
+    {
+      "rule_id": "target-size",
+      "status": "not_fixed",
+      "attempts": 7
+    },
+    {
+      "rule_id": "heading-order",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "region",
+      "status": "not_fixed",
+      "attempts": 3
+    }
+  ],
+  "remaining_rules": [
+    "link-name",
+    "target-size",
+    "region"
+  ],
+  "model_calls": 28,
+  "tokens": 2323002,
+  "seconds": 526,
+  "rejected": {
+    "broken_markup": 1
+  },
+  "flags": {
+    "added_text_alternative": 1,
+    "changed_colours": 1
+  },
+  "input_screen": "nothing found"
+}

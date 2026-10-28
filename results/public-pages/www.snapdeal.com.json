@@ -1,0 +1,68 @@
+{
+  "url": "https://www.snapdeal.com/",
+  "name": "www.snapdeal.com",
+  "category": "e-commerce",
+  "checked": "2026-10-28",
+  "model": "mistralai:mistral-small-2603",
+  "status": "repaired",
+  "http_status": 200,
+  "html_kb": 159,
+  "live_score": 39,
+  "live_rules": 10,
+  "before_score": 27,
+  "after_score": 3,
+  "before_rules": 7,
+  "after_rules": 1,
+  "attempted": 7,
+  "fixed": 6,
+  "improved": 0,
+  "outcomes": [
+    {
+      "rule_id": "image-alt",
+      "status": "fixed",
+      "attempts": 2
+    },
+    {
+      "rule_id": "label",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "list",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "target-size",
+      "status": "fixed",
+      "attempts": 4
+    },
+    {
+      "rule_id": "landmark-one-main",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "page-has-heading-one",
+      "status": "not_fixed",
+      "attempts": 3
+    },
+    {
+      "rule_id": "region",
+      "status": "fixed_by_earlier_fix",
+      "attempts": 0
+    }
+  ],
+  "remaining_rules": [
+    "page-has-heading-one"
+  ],
+  "model_calls": 14,
+  "tokens": 1131470,
+  "seconds": 187,
+  "rejected": {},
+  "flags": {
+    "added_text_alternative": 1,
+    "adds_landmarks": 1
+  },
+  "input_screen": "nothing found"
+}

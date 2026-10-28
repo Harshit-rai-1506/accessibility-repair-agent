@@ -1,0 +1,112 @@
+{
+  "url": "https://www.du.ac.in/",
+  "name": "www.du.ac.in",
+  "category": "education",
+  "checked": "2026-10-28",
+  "model": "mistralai:mistral-small-2603",
+  "status": "repaired",
+  "http_status": 200,
+  "html_kb": 1032,
+  "live_score": 61,
+  "live_rules": 16,
+  "before_score": 54,
+  "after_score": 29,
+  "before_rules": 14,
+  "after_rules": 7,
+  "attempted": 14,
+  "fixed": 7,
+  "improved": 0,
+  "outcomes": [
+    {
+      "rule_id": "aria-allowed-attr",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "aria-required-children",
+      "status": "not_fixed",
+      "attempts": 3
+    },
+    {
+      "rule_id": "aria-required-parent",
+      "status": "not_fixed",
+      "attempts": 4
+    },
+    {
+      "rule_id": "image-alt",
+      "status": "fixed",
+      "attempts": 3
+    },
+    {
+      "rule_id": "color-contrast",
+      "status": "not_fixed",
+      "attempts": 3
+    },
+    {
+      "rule_id": "link-name",
+      "status": "not_fixed",
+      "attempts": 4
+    },
+    {
+      "rule_id": "list",
+      "status": "not_fixed",
+      "attempts": 3
+    },
+    {
+      "rule_id": "listitem",
+      "status": "not_fixed",
+      "attempts": 4
+    },
+    {
+      "rule_id": "marquee",
+      "status": "fixed",
+      "attempts": 2
+    },
+    {
+      "rule_id": "heading-order",
+      "status": "not_fixed",
+      "attempts": 4
+    },
+    {
+      "rule_id": "landmark-one-main",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "landmark-unique",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "region",
+      "status": "fixed_by_earlier_fix",
+      "attempts": 0
+    },
+    {
+      "rule_id": "empty-heading",
+      "status": "fixed",
+      "attempts": 1
+    }
+  ],
+  "remaining_rules": [
+    "aria-required-children",
+    "aria-required-parent",
+    "color-contrast",
+    "link-name",
+    "list",
+    "listitem",
+    "heading-order"
+  ],
+  "model_calls": 50,
+  "tokens": 334648,
+  "seconds": 1738,
+  "rejected": {
+    "broken_markup": 3
+  },
+  "flags": {
+    "added_visible_text": 1,
+    "added_text_alternative": 1,
+    "adds_landmarks": 1
+  },
+  "input_screen": "nothing found"
+}

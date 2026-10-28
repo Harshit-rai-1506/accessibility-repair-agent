@@ -2,7 +2,7 @@
 
 Made with `python -m a11y_agent.evaluate failures --save`.
 
-34 of 138 items not resolved by agent_guarded.
+34 of 138 items not resolved safely by agent_guarded.
 
 | Why | Items |
 |---|---|

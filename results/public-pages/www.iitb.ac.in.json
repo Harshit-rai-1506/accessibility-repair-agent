@@ -1,0 +1,64 @@
+{
+  "url": "https://www.iitb.ac.in/",
+  "name": "www.iitb.ac.in",
+  "category": "education",
+  "checked": "2026-10-28",
+  "model": "mistralai:mistral-small-2603",
+  "status": "repaired",
+  "http_status": 200,
+  "html_kb": 546,
+  "live_score": 23,
+  "live_rules": 6,
+  "before_score": 24,
+  "after_score": 9,
+  "before_rules": 6,
+  "after_rules": 2,
+  "attempted": 6,
+  "fixed": 4,
+  "improved": 0,
+  "outcomes": [
+    {
+      "rule_id": "aria-allowed-attr",
+      "status": "fixed",
+      "attempts": 2
+    },
+    {
+      "rule_id": "aria-required-children",
+      "status": "not_fixed",
+      "attempts": 3
+    },
+    {
+      "rule_id": "link-name",
+      "status": "fixed",
+      "attempts": 1
+    },
+    {
+      "rule_id": "target-size",
+      "status": "not_fixed",
+      "attempts": 4
+    },
+    {
+      "rule_id": "landmark-unique",
+      "status": "fixed",
+      "attempts": 4
+    },
+    {
+      "rule_id": "page-has-heading-one",
+      "status": "fixed",
+      "attempts": 1
+    }
+  ],
+  "remaining_rules": [
+    "aria-required-children",
+    "target-size"
+  ],
+  "model_calls": 22,
+  "tokens": 326255,
+  "seconds": 408,
+  "rejected": {},
+  "flags": {
+    "added_visible_text": 1,
+    "added_text_alternative": 1
+  },
+  "input_screen": "nothing found"
+}
