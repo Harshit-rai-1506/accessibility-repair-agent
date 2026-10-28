@@ -1,0 +1,89 @@
+{
+  "method": "agent_guarded",
+  "model": "mistralai:mistral-small-2603",
+  "dataset": "access",
+  "split": "test",
+  "complete": true,
+  "items_done": 100,
+  "items_total": 100,
+  "all": {
+    "violations": 100,
+    "score_decrease": 0.7742,
+    "resolved": 75,
+    "target_fixed": 76,
+    "introduced_new_violations": 1,
+    "avg_old_score": 3.72,
+    "avg_new_score": 0.84
+  },
+  "deletions_fail": {
+    "violations": 100,
+    "score_decrease": 0.7742,
+    "resolved": 75,
+    "target_fixed": 76,
+    "introduced_new_violations": 1,
+    "avg_old_score": 3.72,
+    "avg_new_score": 0.84
+  },
+  "safe": {
+    "violations": 100,
+    "score_decrease": 0.7742,
+    "resolved": 75,
+    "target_fixed": 76,
+    "introduced_new_violations": 1,
+    "avg_old_score": 3.72,
+    "avg_new_score": 0.84
+  },
+  "unsafe_fixes": 0,
+  "element_level": {
+    "violations": 71,
+    "score_decrease": 0.7895,
+    "resolved": 54,
+    "target_fixed": 55,
+    "introduced_new_violations": 1,
+    "avg_old_score": 4.014,
+    "avg_new_score": 0.845
+  },
+  "by_category": {
+    "": {
+      "violations": 100,
+      "score_decrease": 0.7742,
+      "resolved": 75,
+      "target_fixed": 76,
+      "introduced_new_violations": 1,
+      "avg_old_score": 3.72,
+      "avg_new_score": 0.84
+    }
+  },
+  "status": {
+    "ok": 76,
+    "no_improvement": 24
+  },
+  "dropped_content": 0,
+  "calls": 333,
+  "input_tokens": 669568,
+  "output_tokens": 103635,
+  "model_seconds": 15.2,
+  "paid_cost_usd": 0.0133,
+  "axe_version": "4.12.1",
+  "code_versions": [
+    "1075c0e"
+  ],
+  "tokens_per_item": 7732,
+  "guardrails": {
+    "items": 100,
+    "blocked": 0,
+    "items_with_rejections": 9,
+    "rejections": {
+      "broken_markup": 11,
+      "removes_content": 1
+    },
+    "items_flagged": 62,
+    "flags": {
+      "added_text_alternative": 30,
+      "adds_landmarks": 29,
+      "added_visible_text": 8,
+      "sets_language": 4,
+      "marked_decorative": 2
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "method": "noop",
+  "model": null,
+  "dataset": "access",
+  "split": "test",
+  "complete": true,
+  "items_done": 100,
+  "items_total": 100,
+  "all": {
+    "violations": 100,
+    "score_decrease": 0.0,
+    "resolved": 0,
+    "target_fixed": 0,
+    "introduced_new_violations": 0,
+    "avg_old_score": 3.72,
+    "avg_new_score": 3.72
+  },
+  "deletions_fail": {
+    "violations": 100,
+    "score_decrease": 0.0,
+    "resolved": 0,
+    "target_fixed": 0,
+    "introduced_new_violations": 0,
+    "avg_old_score": 3.72,
+    "avg_new_score": 3.72
+  },
+  "safe": {
+    "violations": 100,
+    "score_decrease": 0.0,
+    "resolved": 0,
+    "target_fixed": 0,
+    "introduced_new_violations": 0,
+    "avg_old_score": 3.72,
+    "avg_new_score": 3.72
+  },
+  "unsafe_fixes": 0,
+  "element_level": {
+    "violations": 71,
+    "score_decrease": 0.0,
+    "resolved": 0,
+    "target_fixed": 0,
+    "introduced_new_violations": 0,
+    "avg_old_score": 4.014,
+    "avg_new_score": 4.014
+  },
+  "by_category": {
+    "": {
+      "violations": 100,
+      "score_decrease": 0.0,
+      "resolved": 0,
+      "target_fixed": 0,
+      "introduced_new_violations": 0,
+      "avg_old_score": 3.72,
+      "avg_new_score": 3.72
+    }
+  },
+  "status": {
+    "ok": 100
+  },
+  "dropped_content": 0,
+  "calls": 0,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "model_seconds": 0,
+  "paid_cost_usd": null,
+  "axe_version": "4.12.1",
+  "code_versions": [
+    "1075c0e"
+  ],
+  "tokens_per_item": 0
+}

@@ -1,0 +1,80 @@
+{
+  "method": "noop",
+  "model": null,
+  "dataset": "accessguru",
+  "split": "test",
+  "complete": true,
+  "items_done": 138,
+  "items_total": 138,
+  "all": {
+    "violations": 138,
+    "score_decrease": 0.0,
+    "resolved": 0,
+    "target_fixed": 0,
+    "introduced_new_violations": 0,
+    "avg_old_score": 3.768,
+    "avg_new_score": 3.768
+  },
+  "deletions_fail": {
+    "violations": 138,
+    "score_decrease": 0.0,
+    "resolved": 0,
+    "target_fixed": 0,
+    "introduced_new_violations": 0,
+    "avg_old_score": 3.768,
+    "avg_new_score": 3.768
+  },
+  "safe": {
+    "violations": 138,
+    "score_decrease": 0.0,
+    "resolved": 0,
+    "target_fixed": 0,
+    "introduced_new_violations": 0,
+    "avg_old_score": 3.768,
+    "avg_new_score": 3.768
+  },
+  "unsafe_fixes": 0,
+  "element_level": {
+    "violations": 92,
+    "score_decrease": 0.0,
+    "resolved": 0,
+    "target_fixed": 0,
+    "introduced_new_violations": 0,
+    "avg_old_score": 4.152,
+    "avg_new_score": 4.152
+  },
+  "by_category": {
+    "Layout": {
+      "violations": 38,
+      "score_decrease": 0.0,
+      "resolved": 0,
+      "target_fixed": 0,
+      "introduced_new_violations": 0,
+      "avg_old_score": 3.947,
+      "avg_new_score": 3.947
+    },
+    "Syntax": {
+      "violations": 100,
+      "score_decrease": 0.0,
+      "resolved": 0,
+      "target_fixed": 0,
+      "introduced_new_violations": 0,
+      "avg_old_score": 3.7,
+      "avg_new_score": 3.7
+    }
+  },
+  "status": {
+    "ok": 138
+  },
+  "dropped_content": 0,
+  "calls": 0,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "model_seconds": 0,
+  "paid_cost_usd": null,
+  "axe_version": "4.12.1",
+  "code_versions": [
+    "1075c0e"
+  ],
+  "tokens_per_item": 0
+}

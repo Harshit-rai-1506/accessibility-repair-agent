@@ -1,0 +1,99 @@
+{
+  "method": "agent_guarded",
+  "model": "mistralai:mistral-small-2603",
+  "dataset": "accessguru",
+  "split": "test",
+  "complete": true,
+  "items_done": 138,
+  "items_total": 138,
+  "all": {
+    "violations": 138,
+    "score_decrease": 0.775,
+    "resolved": 104,
+    "target_fixed": 106,
+    "introduced_new_violations": 2,
+    "avg_old_score": 3.768,
+    "avg_new_score": 0.848
+  },
+  "deletions_fail": {
+    "violations": 138,
+    "score_decrease": 0.775,
+    "resolved": 104,
+    "target_fixed": 106,
+    "introduced_new_violations": 2,
+    "avg_old_score": 3.768,
+    "avg_new_score": 0.848
+  },
+  "safe": {
+    "violations": 138,
+    "score_decrease": 0.775,
+    "resolved": 104,
+    "target_fixed": 106,
+    "introduced_new_violations": 2,
+    "avg_old_score": 3.768,
+    "avg_new_score": 0.848
+  },
+  "unsafe_fixes": 0,
+  "element_level": {
+    "violations": 92,
+    "score_decrease": 0.8351,
+    "resolved": 76,
+    "target_fixed": 78,
+    "introduced_new_violations": 2,
+    "avg_old_score": 4.152,
+    "avg_new_score": 0.685
+  },
+  "by_category": {
+    "Layout": {
+      "violations": 38,
+      "score_decrease": 0.8667,
+      "resolved": 33,
+      "target_fixed": 33,
+      "introduced_new_violations": 0,
+      "avg_old_score": 3.947,
+      "avg_new_score": 0.526
+    },
+    "Syntax": {
+      "violations": 100,
+      "score_decrease": 0.7378,
+      "resolved": 71,
+      "target_fixed": 73,
+      "introduced_new_violations": 2,
+      "avg_old_score": 3.7,
+      "avg_new_score": 0.97
+    }
+  },
+  "status": {
+    "ok": 106,
+    "no_improvement": 32
+  },
+  "dropped_content": 0,
+  "calls": 493,
+  "input_tokens": 1452351,
+  "output_tokens": 139066,
+  "model_seconds": 70.8,
+  "paid_cost_usd": 0.0299,
+  "axe_version": "4.12.1",
+  "code_versions": [
+    "1075c0e"
+  ],
+  "tokens_per_item": 11532,
+  "guardrails": {
+    "items": 138,
+    "blocked": 0,
+    "items_with_rejections": 17,
+    "rejections": {
+      "broken_markup": 24,
+      "removes_content": 2
+    },
+    "items_flagged": 95,
+    "flags": {
+      "adds_landmarks": 32,
+      "added_text_alternative": 31,
+      "changed_colours": 30,
+      "added_visible_text": 12,
+      "marked_decorative": 4,
+      "sets_language": 1
+    }
+  }
+}
